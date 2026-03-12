@@ -66,15 +66,16 @@ export async function POST(req: NextRequest) {
       result = await analyzeReceiptText(text);
     }
 
-    // Save to Supabase with Clerk user ID so each user only sees their own scans
+    const firstItem = result.line_items[0];
+
     await getSupabaseAdmin().from('scans').insert({
       user_id: userId,
       merchant_name: result.merchant_name,
-      amount: result.amount,
+      amount: result.total_amount,
       date: result.date || null,
-      category: result.category,
-      is_deductible: result.is_deductible,
-      irs_category: result.irs_category,
+      category: firstItem?.irs_category || null,
+      is_deductible: result.line_items.some((li) => li.is_deductible),
+      irs_category: firstItem?.irs_category || null,
       raw_data: result,
     });
 

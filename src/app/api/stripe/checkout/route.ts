@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getStripe, PRICE_ID } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export async function POST() {
   try {
+    const priceId = process.env.STRIPE_PRICE_ID;
+    if (!priceId) {
+      return NextResponse.json(
+        { error: 'Stripe not configured. Add STRIPE_PRICE_ID to environment.' },
+        { status: 500 }
+      );
+    }
+
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -38,7 +46,7 @@ export async function POST() {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: PRICE_ID,
+          price: priceId,
           quantity: 1,
         },
       ],

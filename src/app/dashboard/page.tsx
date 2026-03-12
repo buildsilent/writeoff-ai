@@ -3,18 +3,33 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
-import { ScanResultCard } from '@/components/ScanResultCard';
+import { LineItemCard } from '@/components/LineItemCard';
 import { Upload, Check, Loader2, CreditCard, Camera } from 'lucide-react';
+import { getCategoryEmoji } from '@/lib/constants';
+
+interface LineItem {
+  description: string;
+  amount: number;
+  irs_category: string;
+  deduction_percent: number;
+  is_deductible: boolean;
+  confidence: number;
+  explanation: string;
+}
 
 interface Scan {
   id: string;
-  user_id: string;
   merchant_name: string | null;
   amount: number;
   date: string | null;
-  category: string | null;
-  is_deductible: boolean;
-  irs_category: string | null;
+  is_deductible?: boolean;
+  irs_category?: string | null;
+  raw_data?: {
+    merchant_name?: string;
+    date?: string;
+    total_amount?: number;
+    line_items?: LineItem[];
+  };
   created_at: string;
 }
 
@@ -25,20 +40,63 @@ interface Usage {
   hasSubscription: boolean;
 }
 
-function groupScansByIRSCategory(scans: Scan[]): Map<string, Scan[]> {
-  const groups = new Map<string, Scan[]>();
+interface FlattenedItem {
+  id: string;
+  scanId: string;
+  merchantName: string;
+  date: string | null;
+  createdAt: string;
+  item: LineItem;
+}
 
+function flattenScansToItems(scans: Scan[]): FlattenedItem[] {
+  const items: FlattenedItem[] = [];
   for (const scan of scans) {
-    const category = scan.irs_category || (scan.is_deductible ? 'Other Deductible' : 'Not Deductible');
-    const existing = groups.get(category) || [];
-    existing.push(scan);
-    groups.set(category, existing);
+    const raw = scan.raw_data as Scan['raw_data'];
+    const merchantName = raw?.merchant_name || scan.merchant_name || 'Unknown';
+    const date = raw?.date || scan.date || scan.created_at?.slice(0, 10) || null;
+
+    if (raw?.line_items && Array.isArray(raw.line_items)) {
+      for (const item of raw.line_items) {
+        items.push({
+          id: `${scan.id}-${item.description}-${item.amount}`,
+          scanId: scan.id,
+          merchantName,
+          date,
+          createdAt: scan.created_at || '',
+          item,
+        });
+      }
+    } else {
+      items.push({
+        id: scan.id,
+        scanId: scan.id,
+        merchantName,
+        date,
+        createdAt: scan.created_at || '',
+        item: {
+          description: merchantName,
+          amount: Number(scan.amount),
+          irs_category: scan.irs_category || 'Other',
+          deduction_percent: scan.is_deductible ? 100 : 0,
+          is_deductible: scan.is_deductible ?? false,
+          confidence: 0.8,
+          explanation: '',
+        },
+      });
+    }
   }
+  return items;
+}
 
-  groups.forEach((scansInGroup) => {
-    scansInGroup.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  });
-
+function groupItemsByCategory(items: FlattenedItem[]): Map<string, FlattenedItem[]> {
+  const groups = new Map<string, FlattenedItem[]>();
+  for (const fi of items) {
+    const cat = fi.item.irs_category || (fi.item.is_deductible ? 'Other Deductible' : 'Not Deductible');
+    const existing = groups.get(cat) || [];
+    existing.push(fi);
+    groups.set(cat, existing);
+  }
   return groups;
 }
 
@@ -53,20 +111,29 @@ export default function DashboardPage() {
       fetch('/api/usage').then((r) => r.json()),
     ]).then(([scansData, usageData]) => {
       setScans(Array.isArray(scansData) ? scansData : []);
-      setUsage(usageData.hasOwnProperty('scanCount') ? usageData : null);
+      setUsage(usageData?.hasOwnProperty('scanCount') ? usageData : null);
     }).finally(() => setLoading(false));
   }, []);
 
-  const scansByCategory = useMemo(() => groupScansByIRSCategory(scans), [scans]);
+  const flattenedItems = useMemo(() => flattenScansToItems(scans), [scans]);
+  const itemsByCategory = useMemo(() => groupItemsByCategory(flattenedItems), [flattenedItems]);
 
   const thisYear = new Date().getFullYear();
-  const deductibleTotal = scans
-    .filter((s) => s.is_deductible)
-    .filter((s) => {
-      const d = s.date || s.created_at;
-      return d && new Date(d).getFullYear() === thisYear;
-    })
-    .reduce((sum, s) => sum + Number(s.amount), 0);
+  const { categoryTotals, grandTotal } = useMemo(() => {
+    const totals = new Map<string, number>();
+    let grand = 0;
+    for (const fi of flattenedItems) {
+      if (!fi.item.is_deductible) continue;
+      const d = fi.date || fi.createdAt;
+      const itemYear = d ? new Date(d).getFullYear() : thisYear;
+      if (itemYear !== thisYear) continue;
+      const deductibleAmount = fi.item.amount * (fi.item.deduction_percent / 100);
+      const cat = fi.item.irs_category;
+      totals.set(cat, (totals.get(cat) || 0) + deductibleAmount);
+      grand += deductibleAmount;
+    }
+    return { categoryTotals: totals, grandTotal: grand };
+  }, [flattenedItems, thisYear]);
 
   if (loading) {
     return (
@@ -85,14 +152,13 @@ export default function DashboardPage() {
       <main className="mx-auto max-w-3xl px-6 py-12">
         <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
 
-        {/* Stats */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6">
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
               Estimated deductions {thisYear}
             </p>
             <p className="mt-2 text-3xl font-semibold text-[#22c55e]">
-              ${deductibleTotal.toFixed(2)}
+              ${grandTotal.toFixed(2)}
             </p>
           </div>
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6">
@@ -121,7 +187,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* CTA */}
         <Link
           href="/scan"
           className="btn-primary mt-8 flex items-center justify-center gap-2 rounded-lg bg-[#22c55e] py-3.5 text-sm font-medium text-black"
@@ -130,11 +195,34 @@ export default function DashboardPage() {
           Scan new receipt
         </Link>
 
-        {/* Scan history */}
-        <div className="mt-16">
+        {categoryTotals.size > 0 && (
+          <div className="mt-12">
+            <h2 className="text-sm font-medium text-white">Totals by IRS category</h2>
+            <div className="mt-3 space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              {Array.from(categoryTotals.entries())
+                .sort(([, a], [, b]) => b - a)
+                .map(([cat, total]) => (
+                  <div key={cat} className="flex items-center justify-between">
+                    <span className="text-sm text-zinc-400">
+                      {getCategoryEmoji(cat)} {cat}
+                    </span>
+                    <span className="font-semibold text-[#22c55e]">${total.toFixed(2)}</span>
+                  </div>
+                ))}
+              <div className="border-t border-white/[0.06] pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-white">Grand total</span>
+                  <span className="text-lg font-bold text-[#22c55e]">${grandTotal.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-12">
           <h2 className="text-sm font-medium text-white">Scan history</h2>
           <p className="mt-0.5 text-xs text-zinc-500">By IRS deduction category</p>
-          {scans.length === 0 ? (
+          {flattenedItems.length === 0 ? (
             <div className="mt-6 rounded-xl border border-dashed border-white/[0.08] p-12 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg border border-white/[0.06]">
                 <Upload className="h-6 w-6 text-zinc-600" />
@@ -152,33 +240,27 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="mt-6 space-y-10">
-              {Array.from(scansByCategory.entries())
+              {Array.from(itemsByCategory.entries())
                 .sort(([a], [b]) => {
                   if (a === 'Not Deductible') return 1;
                   if (b === 'Not Deductible') return -1;
                   return a.localeCompare(b);
                 })
-                .map(([irsCategory, categoryScans]) => (
+                .map(([irsCategory, items]) => (
                   <section key={irsCategory}>
-                    <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-500">
-                      {irsCategory}
+                    <h3 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-zinc-500">
+                      {getCategoryEmoji(irsCategory)} {irsCategory}
                     </h3>
                     <div className="space-y-4">
-                      {categoryScans.map((scan) => (
+                      {items.map((fi) => (
                         <div
-                          key={scan.id}
+                          key={fi.id}
                           className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
                         >
-                          <ScanResultCard
-                            result={{
-                              merchant_name: scan.merchant_name || 'Unknown',
-                              amount: scan.amount,
-                              date: scan.date || scan.created_at?.slice(0, 10) || '',
-                              category: scan.category || '',
-                              is_deductible: scan.is_deductible,
-                              irs_category: scan.irs_category,
-                            }}
-                            saved
+                          <LineItemCard
+                            item={fi.item}
+                            merchantName={fi.merchantName}
+                            date={fi.date}
                           />
                         </div>
                       ))}

@@ -1,21 +1,39 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { useState } from 'react';
+import { X, Loader2 } from 'lucide-react';
 
 interface UpgradeModalProps {
   onClose: () => void;
 }
 
 export function UpgradeModal({ onClose }: UpgradeModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const handleUpgrade = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/stripe/checkout', { method: 'POST' });
       const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to start checkout');
+        setLoading(false);
+        return;
+      }
+
       if (data.url) {
         window.location.href = data.url;
+        return;
       }
+
+      setError('No checkout URL received');
     } catch {
-      // ignore
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -26,6 +44,7 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
           <h2 className="text-lg font-semibold text-white">Upgrade to Pro</h2>
           <button
             onClick={onClose}
+            type="button"
             className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:text-white"
           >
             <X className="h-4 w-4" />
@@ -45,18 +64,32 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
             <li>Cancel anytime</li>
           </ul>
         </div>
+        {error && (
+          <p className="mt-3 text-sm text-red-400">{error}</p>
+        )}
         <div className="mt-6 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 rounded-lg border border-white/[0.08] py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.04]"
+            type="button"
+            disabled={loading}
+            className="flex-1 rounded-lg border border-white/[0.08] py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
           >
             Maybe later
           </button>
           <button
             onClick={handleUpgrade}
-            className="btn-primary flex-1 rounded-lg bg-[#22c55e] py-2.5 text-sm font-medium text-black"
+            type="button"
+            disabled={loading}
+            className="btn-primary flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#22c55e] py-2.5 text-sm font-medium text-black disabled:opacity-50"
           >
-            Upgrade
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Redirecting...
+              </>
+            ) : (
+              'Upgrade'
+            )}
           </button>
         </div>
       </div>

@@ -3,29 +3,43 @@
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
-import { ScanResultCard, type ScanResult } from '@/components/ScanResultCard';
+import { ScanResults } from '@/components/ScanResults';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { Camera, FileText, Loader2 } from 'lucide-react';
+
+const FILE_INPUT_ID = 'receipt-file-input';
 
 export default function ScanPage() {
   const [mode, setMode] = useState<'upload' | 'paste'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [result, setResult] = useState<{ line_items?: unknown[]; merchant_name?: string; date?: string; total_amount?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
+    const input = e.target;
+    const f = input.files?.[0];
     if (f && (f.type.startsWith('image/') || f.type === 'application/pdf')) {
       setFile(f);
       setError(null);
-    } else {
+      setResult(null);
+    } else if (f) {
       setFile(null);
-      setError('Please select an image file (JPEG, PNG, WebP)');
+      setError('Please select an image file (JPEG, PNG, or WebP)');
+    }
+    input.value = '';
+  };
+
+  const handleInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    const f = input.files?.[0];
+    if (f && f.type.startsWith('image/')) {
+      setFile(f);
+      setError(null);
     }
   };
 
@@ -35,12 +49,12 @@ export default function ScanPage() {
 
     if (mode === 'upload') {
       if (!file) {
-        setError('Please select an image');
+        setError('Please select or take a photo first');
         return;
       }
     } else {
       if (!text.trim()) {
-        setError('Please paste receipt text');
+        setError('Please paste the receipt text');
         return;
       }
     }
@@ -94,7 +108,6 @@ export default function ScanPage() {
           Upload a photo or paste the receipt text below
         </p>
 
-        {/* Mode toggle */}
         <div className="mt-8 flex gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-1">
           <button
             onClick={() => {
@@ -102,7 +115,9 @@ export default function ScanPage() {
               setFile(null);
               setText('');
               setError(null);
+              setResult(null);
             }}
+            type="button"
             className={`flex flex-1 items-center justify-center gap-2 rounded-md py-2.5 text-sm font-medium transition-colors ${
               mode === 'upload'
                 ? 'bg-white text-black'
@@ -117,7 +132,9 @@ export default function ScanPage() {
               setMode('paste');
               setFile(null);
               setError(null);
+              setResult(null);
             }}
+            type="button"
             className={`flex flex-1 items-center justify-center gap-2 rounded-md py-2.5 text-sm font-medium transition-colors ${
               mode === 'paste'
                 ? 'bg-white text-black'
@@ -129,30 +146,32 @@ export default function ScanPage() {
           </button>
         </div>
 
-        {/* Input area */}
         <div className="mt-6">
           {mode === 'upload' ? (
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="group flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] transition-colors hover:border-white/[0.12]"
+            <label
+              htmlFor={FILE_INPUT_ID}
+              className="group relative flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] transition-colors hover:border-white/[0.12]"
             >
               <input
                 ref={fileInputRef}
+                id={FILE_INPUT_ID}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
                 onChange={handleFileChange}
-                className="hidden"
+                onInput={handleInput}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                aria-label="Select or take a photo of your receipt"
               />
-              <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 transition-colors group-hover:border-white/[0.1]">
-                <Camera className="h-12 w-12 text-zinc-600" />
-              </div>
-              <p className="mt-4 text-sm font-medium text-white">
-                {file ? file.name : 'Tap to select or take a photo'}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                JPEG, PNG, or WebP
-              </p>
-            </div>
+                <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 transition-colors group-hover:border-white/[0.1]">
+                  <Camera className="h-12 w-12 text-zinc-600" />
+                </div>
+                <p className="mt-4 text-sm font-medium text-white">
+                  {file ? file.name : 'Tap to select or take a photo'}
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  JPEG, PNG, or WebP
+                </p>
+            </label>
           ) : (
             <textarea
               value={text}
@@ -171,6 +190,7 @@ export default function ScanPage() {
         <button
           onClick={handleSubmit}
           disabled={loading}
+          type="button"
           className="btn-primary mt-8 flex w-full items-center justify-center gap-2 rounded-lg bg-[#22c55e] py-3.5 text-sm font-medium text-black disabled:opacity-50"
         >
           {loading ? (
@@ -186,13 +206,16 @@ export default function ScanPage() {
           )}
         </button>
 
-        {result && (
-          <div className="mt-12">
-            <ScanResultCard
-              result={result as unknown as ScanResult}
-              saved={saved}
-            />
-          </div>
+        {result && result.line_items && (
+          <ScanResults
+            result={{
+              merchant_name: result.merchant_name || 'Unknown',
+              date: result.date || null,
+              total_amount: result.total_amount ?? 0,
+              line_items: result.line_items as Parameters<typeof ScanResults>[0]['result']['line_items'],
+            }}
+            saved={saved}
+          />
         )}
       </main>
 
@@ -209,7 +232,7 @@ function fileToBase64(file: File): Promise<string> {
       const base64 = result.split(',')[1];
       resolve(base64 || '');
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
 }

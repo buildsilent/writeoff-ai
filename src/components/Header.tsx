@@ -37,7 +37,7 @@ export function Header() {
             </Link>
             <Link
               href="/scan"
-              className="ml-2 rounded-lg bg-[#22c55e] px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90"
+              className="relative z-10 ml-2 cursor-pointer rounded-lg bg-[#22c55e] px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90"
             >
               Scan receipt
             </Link>
