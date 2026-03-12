@@ -43,7 +43,7 @@ export async function POST() {
           quantity: 1,
         },
       ],
-      success_url: `${appUrl}/dashboard?upgraded=1`,
+      success_url: `${appUrl}/success`,
       cancel_url: `${appUrl}/scan?canceled=1`,
       metadata: { clerk_user_id: userId },
       subscription_data: {
