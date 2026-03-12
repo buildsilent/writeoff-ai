@@ -20,28 +20,21 @@ export async function POST() {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-    // Check if user has existing Stripe customer
-    const { data: sub } = await getSupabaseAdmin()
+    // Clear any stored Stripe customer ID (e.g. from test mode) so we always create a fresh
+    // checkout session. This avoids "customer exists in test mode but live key used" errors.
+    await getSupabaseAdmin()
       .from('subscriptions')
-      .select('stripe_customer_id')
-      .eq('user_id', userId)
-      .single();
+      .update({
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+        status: 'incomplete',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId);
 
-    let customerId = sub?.stripe_customer_id;
-
-    if (!customerId) {
-      const customer = await getStripe().customers.create({
-        metadata: { clerk_user_id: userId },
-      });
-      customerId = customer.id;
-      await getSupabaseAdmin().from('subscriptions').upsert(
-        { user_id: userId, stripe_customer_id: customerId, status: 'incomplete' },
-        { onConflict: 'user_id' }
-      );
-    }
-
+    // Create fresh checkout session without reusing customer ID. Stripe will create a new
+    // customer when the user completes checkout; the webhook will save it.
     const session = await getStripe().checkout.sessions.create({
-      customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [
