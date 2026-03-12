@@ -48,7 +48,6 @@ export async function POST() {
       metadata: { clerk_user_id: userId },
       subscription_data: {
         metadata: { clerk_user_id: userId },
-        trial_period_days: 0,
       },
     });
 
