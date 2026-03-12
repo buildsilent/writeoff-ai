@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 
 export function ExampleScanCard() {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-medium text-white">Office supplies</p>
@@ -16,7 +16,7 @@ export function ExampleScanCard() {
           </span>
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <span className="rounded-md bg-white/[0.04] px-2 py-1 text-xs text-white">
           📦 Office Supplies
         </span>

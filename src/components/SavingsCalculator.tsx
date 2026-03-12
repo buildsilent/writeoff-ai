@@ -22,14 +22,14 @@ export function SavingsCalculator() {
 
   return (
     <section className="mx-auto max-w-2xl">
-      <div className="flex items-center gap-2 mb-6">
-        <Calculator className="h-6 w-6 text-[#FF6B00]" />
-        <h2 className="text-2xl font-semibold text-white">How much could you save?</h2>
+      <div className="flex items-center gap-2 mb-4">
+        <Calculator className="h-5 w-5 text-[#FF6B00]" />
+        <h2 className="text-xl font-semibold text-white">How much could you save?</h2>
       </div>
-      <p className="text-zinc-500 mb-8">
+      <p className="text-sm text-zinc-500 mb-6">
         Select your work type and estimated monthly business spending. We&apos;ll show you a realistic tax savings estimate.
       </p>
-      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 md:p-8">
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 md:p-6">
         <div className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-white mb-2">I&apos;m a...</label>
@@ -60,13 +60,13 @@ export function SavingsCalculator() {
             </div>
           </div>
         </div>
-        <div className="mt-8 rounded-xl border border-[#FF6B00]/30 bg-[#FF6B00]/5 p-6">
+        <div className="mt-6 rounded-xl border border-[#FF6B00]/30 bg-[#FF6B00]/5 p-4">
           <p className="text-sm text-zinc-500">Estimated annual tax savings</p>
-          <p className="mt-2 text-4xl font-bold text-[#FF6B00]">${estimatedSavings.toLocaleString()}</p>
+          <p className="mt-1.5 text-3xl font-bold text-[#FF6B00]">${estimatedSavings.toLocaleString()}</p>
           <p className="mt-2 text-xs text-zinc-500">
             Based on ~{Math.round(rate * 100)}% effective tax rate for your work type. Actual savings depend on your receipts and tax situation.
           </p>
-          <p className="mt-4 text-sm text-zinc-400">
+          <p className="mt-3 text-xs text-zinc-400">
             💡 That&apos;s ${Math.round(estimatedSavings / 12).toLocaleString()}/month back in your pocket. Scan your receipts with TaxSnapper to capture every deduction.
           </p>
         </div>
