@@ -3,6 +3,9 @@ import Stripe from 'stripe';
 import { getStripe } from '@/lib/stripe';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
 export async function POST(req: NextRequest) {
@@ -25,7 +28,10 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         const userId = session.metadata?.clerk_user_id;
-        const subscriptionId = session.subscription as string;
+        const subscriptionId =
+          typeof session.subscription === 'string'
+            ? session.subscription
+            : (session.subscription as Stripe.Subscription)?.id ?? null;
 
         if (userId && subscriptionId) {
           const subscription = await getStripe().subscriptions.retrieve(subscriptionId, {

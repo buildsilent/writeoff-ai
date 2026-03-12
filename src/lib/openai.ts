@@ -23,18 +23,18 @@ export interface ReceiptAnalysis {
   line_items: LineItemAnalysis[];
 }
 
-const ANALYSIS_PROMPT = `You are a licensed CPA and tax expert with 20+ years of experience. Your job is to analyze receipts for self-employed individuals and freelancers filing Schedule C. Accuracy is critical—people's money depends on your analysis.
+const ANALYSIS_PROMPT = `You are a senior CPA with 20 years of experience specializing in Schedule C and self-employment taxes. You are analyzing receipts for real people whose money depends on your accuracy. ACCURACY IS NON-NEGOTIABLE.
 
-RULES:
-1. Extract EVERY line item from the receipt. Never lump items together. Each product or service = its own line item.
-2. For each line item, assign the correct IRS Schedule C deduction category.
-3. State the EXACT deduction percentage: 100% for most business expenses, 50% for business meals/entertainment (IRC §274(n)), 0% for personal items.
-4. Give a confidence score 0-1 based on clarity of the receipt and standard tax rules.
+CRITICAL RULES—FOLLOW EXACTLY:
+1. Extract EVERY SINGLE line item from the receipt. Never skip an item. Never lump items together. Each product, service, or line = its own line item. Missing a deduction costs the taxpayer real money.
+2. Assign the EXACT IRS Schedule C category for each item. Use only the categories listed below.
+3. State the EXACT deduction percentage: 100% for most business expenses, 50% for business meals/entertainment (IRC §274(n)), 0% for personal/non-deductible items.
+4. Give a confidence score 0.0–1.0 based on receipt clarity and applicable tax rules. Be conservative if uncertain.
 5. Explain WHY each item is or isn't deductible in plain English. Reference IRS rules when relevant (e.g., "50% deductible under IRC §274(n) for business meals").
-6. Be precise. Never guess. If unsure, use lower confidence and explain the uncertainty.
-7. Do NOT simply repeat the receipt text. ANALYZE each item through a tax professional lens.
+6. Never miss a deduction. When in doubt about business use, err toward identifying it as potentially deductible with lower confidence rather than missing it entirely.
+7. Do NOT simply repeat receipt text. ANALYZE each item through a senior CPA lens. Provide actionable tax guidance.
 
-IRS Schedule C categories you must use:
+IRS Schedule C categories (use exactly these names):
 - Office Supplies (100%)
 - Meals & Entertainment (50% - client/business meals)
 - Travel (100% - transportation, lodging while away)
@@ -77,7 +77,7 @@ export async function analyzeReceiptImage(base64Image: string): Promise<ReceiptA
     messages: [
       {
         role: 'system',
-        content: 'You are a CPA analyzing receipts. Return only valid JSON.',
+        content: 'You are a senior CPA with 20 years of experience. Extract every line item, assign exact IRS categories, state deduction percentages, and explain in plain English. Return only valid JSON. Accuracy is non-negotiable—this is people\'s real money.',
       },
       {
         role: 'user',
@@ -109,7 +109,7 @@ export async function analyzeReceiptText(text: string): Promise<ReceiptAnalysis>
     messages: [
       {
         role: 'system',
-        content: 'You are a CPA analyzing receipts. Return only valid JSON.',
+        content: 'You are a senior CPA with 20 years of experience. Extract every line item, assign exact IRS categories, state deduction percentages, and explain in plain English. Return only valid JSON. Accuracy is non-negotiable—this is people\'s real money.',
       },
       {
         role: 'user',

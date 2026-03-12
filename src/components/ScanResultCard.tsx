@@ -24,7 +24,7 @@ export function ScanResultCard({ result, onSave, saved }: ScanResultCardProps) {
       <div className="flex items-center justify-between">
         <span className="text-xs text-zinc-500">Scan result</span>
         {result.is_deductible ? (
-          <span className="flex items-center gap-1.5 rounded-full bg-[#22c55e]/10 px-2.5 py-1 text-xs font-medium text-[#22c55e]">
+          <span className="flex items-center gap-1.5 rounded-full bg-[#FF6B00]/10 px-2.5 py-1 text-xs font-medium text-[#FF6B00]">
             <Check className="h-3 w-3" />
             Deductible
           </span>
@@ -38,7 +38,7 @@ export function ScanResultCard({ result, onSave, saved }: ScanResultCardProps) {
       <h3 className="mt-2 text-lg font-semibold text-white">
         {result.merchant_name || 'Unknown merchant'}
       </h3>
-      <p className="mt-0.5 text-2xl font-semibold text-[#22c55e]">
+      <p className="mt-0.5 text-2xl font-semibold text-[#FF6B00]">
         ${typeof result.amount === 'number' ? result.amount.toFixed(2) : result.amount}
       </p>
       <div className="mt-4 space-y-2 text-sm">
@@ -51,13 +51,13 @@ export function ScanResultCard({ result, onSave, saved }: ScanResultCardProps) {
       {onSave && !saved && (
         <button
           onClick={onSave}
-          className="btn-primary mt-4 w-full rounded-lg bg-[#22c55e] py-2.5 text-sm font-medium text-black"
+          className="btn-primary mt-4 w-full rounded-lg bg-[#FF6B00] py-2.5 text-sm font-medium text-black"
         >
           Save to history
         </button>
       )}
       {saved && (
-        <p className="mt-4 text-center text-xs text-[#22c55e]">Saved to your history</p>
+        <p className="mt-4 text-center text-xs text-[#FF6B00]">Saved to your history</p>
       )}
     </div>
   );

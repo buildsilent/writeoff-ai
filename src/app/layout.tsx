@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WriteOff AI - Find Hidden Tax Deductions in Your Receipts",
+  title: "TaxSnapper - Find Hidden Tax Deductions in Your Receipts",
   description: "Upload a receipt and instantly discover tax deductions. AI-powered receipt analysis for freelancers and small business owners.",
 };
 

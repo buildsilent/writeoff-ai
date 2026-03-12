@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { Suspense, useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { LineItemCard } from '@/components/LineItemCard';
-import { Upload, Check, Loader2, CreditCard, Camera } from 'lucide-react';
+import { Upload, Check, Loader2, CreditCard, Camera, Download } from 'lucide-react';
 import { getCategoryEmoji } from '@/lib/constants';
 
 interface LineItem {
@@ -100,20 +101,45 @@ function groupItemsByCategory(items: FlattenedItem[]): Map<string, FlattenedItem
   return groups;
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
+  const searchParams = useSearchParams();
   const [scans, setScans] = useState<Scan[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [upgradeSuccess, setUpgradeSuccess] = useState(false);
 
-  useEffect(() => {
+  const fetchData = () =>
     Promise.all([
       fetch('/api/scans').then((r) => r.json()),
       fetch('/api/usage').then((r) => r.json()),
     ]).then(([scansData, usageData]) => {
       setScans(Array.isArray(scansData) ? scansData : []);
       setUsage(usageData?.hasOwnProperty('scanCount') ? usageData : null);
-    }).finally(() => setLoading(false));
-  }, []);
+      return usageData;
+    });
+
+  useEffect(() => {
+    const justUpgraded = searchParams.get('upgraded') === '1';
+
+    fetchData().then((usageData) => {
+      setLoading(false);
+      if (justUpgraded) {
+        setUpgradeSuccess(true);
+        // Webhook can be delayed; poll for subscription status
+        let attempts = 0;
+        const poll = () => {
+          attempts++;
+          fetch('/api/usage')
+            .then((r) => r.json())
+            .then((u) => {
+              if (u?.hasSubscription) setUsage(u);
+              else if (attempts < 5) setTimeout(poll, 2000);
+            });
+        };
+        if (!usageData?.hasSubscription) setTimeout(poll, 2000);
+      }
+    });
+  }, [searchParams]);
 
   const flattenedItems = useMemo(() => flattenScansToItems(scans), [scans]);
   const itemsByCategory = useMemo(() => groupItemsByCategory(flattenedItems), [flattenedItems]);
@@ -140,7 +166,7 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-[#0a0a0a]">
         <Header />
         <main className="flex min-h-[60vh] items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-[#22c55e]" />
+          <Loader2 className="h-6 w-6 animate-spin text-[#FF6B00]" />
         </main>
       </div>
     );
@@ -150,6 +176,11 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#0a0a0a]">
       <Header />
       <main className="mx-auto max-w-3xl px-6 py-12">
+        {upgradeSuccess && (
+          <div className="mb-6 rounded-xl border border-[#FF6B00]/30 bg-[#FF6B00]/10 px-4 py-3 text-sm text-[#FF6B00]">
+            Welcome to Pro! You now have unlimited receipt scans.
+          </div>
+        )}
         <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -157,7 +188,7 @@ export default function DashboardPage() {
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
               Estimated deductions {thisYear}
             </p>
-            <p className="mt-2 text-3xl font-semibold text-[#22c55e]">
+            <p className="mt-2 text-3xl font-semibold text-[#FF6B00]">
               ${grandTotal.toFixed(2)}
             </p>
           </div>
@@ -167,7 +198,7 @@ export default function DashboardPage() {
             </p>
             <p className="mt-2 text-3xl font-semibold text-white">
               {usage?.hasSubscription ? (
-                <span className="flex items-center gap-2 text-[#22c55e]">
+                <span className="flex items-center gap-2 text-[#FF6B00]">
                   <Check className="h-5 w-5" />
                   Unlimited
                 </span>
@@ -177,8 +208,8 @@ export default function DashboardPage() {
             </p>
             {!usage?.hasSubscription && (
               <Link
-                href="/scan"
-                className="mt-2 inline-flex items-center gap-1.5 text-xs text-[#22c55e] transition-opacity hover:opacity-80"
+                href="/go-pro"
+                className="mt-2 inline-flex items-center gap-1.5 text-xs text-[#FF6B00] transition-opacity hover:opacity-80"
               >
                 <CreditCard className="h-3.5 w-3.5" />
                 Upgrade for unlimited
@@ -187,13 +218,24 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <Link
-          href="/scan"
-          className="btn-primary mt-8 flex items-center justify-center gap-2 rounded-lg bg-[#22c55e] py-3.5 text-sm font-medium text-black"
-        >
-          <Camera className="h-4 w-4" />
-          Scan new receipt
-        </Link>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Link
+            href="/scan"
+            className="btn-primary flex items-center justify-center gap-2 rounded-lg bg-[#FF6B00] py-3.5 text-sm font-medium text-black"
+          >
+            <Camera className="h-4 w-4" />
+            Scan new receipt
+          </Link>
+          {usage?.hasSubscription && (
+            <a
+              href="/api/export"
+              className="flex items-center justify-center gap-2 rounded-lg border border-white/[0.12] py-3.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.04]"
+            >
+              <Download className="h-4 w-4" />
+              Export to CSV
+            </a>
+          )}
+        </div>
 
         {categoryTotals.size > 0 && (
           <div className="mt-12">
@@ -206,13 +248,13 @@ export default function DashboardPage() {
                     <span className="text-sm text-zinc-400">
                       {getCategoryEmoji(cat)} {cat}
                     </span>
-                    <span className="font-semibold text-[#22c55e]">${total.toFixed(2)}</span>
+                    <span className="font-semibold text-[#FF6B00]">${total.toFixed(2)}</span>
                   </div>
                 ))}
               <div className="border-t border-white/[0.06] pt-3">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-white">Grand total</span>
-                  <span className="text-lg font-bold text-[#22c55e]">${grandTotal.toFixed(2)}</span>
+                  <span className="text-lg font-bold text-[#FF6B00]">${grandTotal.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -233,7 +275,7 @@ export default function DashboardPage() {
               </p>
               <Link
                 href="/scan"
-                className="btn-primary mt-6 inline-block rounded-lg bg-[#22c55e] px-5 py-2.5 text-sm font-medium text-black"
+                className="btn-primary mt-6 inline-block rounded-lg bg-[#FF6B00] px-5 py-2.5 text-sm font-medium text-black"
               >
                 Scan receipt
               </Link>
@@ -272,5 +314,17 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#FF6B00] border-t-transparent" />
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }

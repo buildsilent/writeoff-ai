@@ -1,4 +1,4 @@
-# WriteOff AI
+# TaxSnapper
 
 Find hidden tax deductions in your receipts instantly. Upload a photo or paste receipt text, and our AI analyzes it to extract merchant, amount, date, category, and whether it's tax deductible—with the IRS category.
 
@@ -71,7 +71,7 @@ Open [http://localhost:3000](http://localhost:3000).
 4. Deploy
 
 Remember to:
-- Set `NEXT_PUBLIC_APP_URL` to your production URL (e.g. `https://writeoff-ai.vercel.app`)
+- Set `NEXT_PUBLIC_APP_URL` to your production URL (e.g. `https://taxsnapper.vercel.app`)
 - Configure Stripe webhooks: add endpoint `https://your-domain.com/api/stripe/webhook` and subscribe to `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
 
 ## User Flow

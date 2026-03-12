@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { analyzeReceiptImage, analyzeReceiptText } from '@/lib/openai';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { hasActiveSubscription } from '@/lib/subscription';
 import { FREE_SCAN_LIMIT } from '@/lib/stripe';
 
 async function getScanCount(userId: string): Promise<number> {
@@ -12,20 +13,6 @@ async function getScanCount(userId: string): Promise<number> {
 
   if (error) return 0;
   return count ?? 0;
-}
-
-async function hasActiveSubscription(userId: string): Promise<boolean> {
-  const { data } = await getSupabaseAdmin()
-    .from('subscriptions')
-    .select('status, current_period_end')
-    .eq('user_id', userId)
-    .single();
-
-  if (!data || data.status !== 'active') return false;
-  if (data.current_period_end) {
-    return new Date(data.current_period_end) > new Date();
-  }
-  return true;
 }
 
 export async function POST(req: NextRequest) {

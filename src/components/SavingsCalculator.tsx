@@ -1,0 +1,76 @@
+'use client';
+
+import { useState } from 'react';
+import { Calculator } from 'lucide-react';
+
+const JOB_TYPES = [
+  { id: 'freelancer', label: 'Freelancer', rate: 0.25 },
+  { id: 'content_creator', label: 'Content Creator', rate: 0.22 },
+  { id: 'uber_driver', label: 'Uber / Delivery Driver', rate: 0.20 },
+  { id: 'small_business', label: 'Small Business Owner', rate: 0.28 },
+  { id: 'w2_side_hustle', label: 'W-2 with Side Hustle', rate: 0.24 },
+] as const;
+
+export function SavingsCalculator() {
+  const [jobType, setJobType] = useState<string>('freelancer');
+  const [monthlySpend, setMonthlySpend] = useState<string>('500');
+
+  const rate = JOB_TYPES.find((j) => j.id === jobType)?.rate ?? 0.25;
+  const spend = parseFloat(monthlySpend) || 0;
+  const annualSpend = spend * 12;
+  const estimatedSavings = Math.round(annualSpend * rate);
+
+  return (
+    <section className="mx-auto max-w-2xl">
+      <div className="flex items-center gap-2 mb-6">
+        <Calculator className="h-6 w-6 text-[#FF6B00]" />
+        <h2 className="text-2xl font-semibold text-white">How much could you save?</h2>
+      </div>
+      <p className="text-zinc-500 mb-8">
+        Select your work type and estimated monthly business spending. We&apos;ll show you a realistic tax savings estimate.
+      </p>
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 md:p-8">
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-white mb-2">I&apos;m a...</label>
+            <select
+              value={jobType}
+              onChange={(e) => setJobType(e.target.value)}
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-white focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
+            >
+              {JOB_TYPES.map((j) => (
+                <option key={j.id} value={j.id} className="bg-[#1a1a1a] text-white">
+                  {j.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-white mb-2">Monthly business spending (receipts, supplies, etc.)</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
+              <input
+                type="number"
+                min="0"
+                step="50"
+                value={monthlySpend}
+                onChange={(e) => setMonthlySpend(e.target.value)}
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3 pl-8 pr-4 text-white focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="mt-8 rounded-xl border border-[#FF6B00]/30 bg-[#FF6B00]/5 p-6">
+          <p className="text-sm text-zinc-500">Estimated annual tax savings</p>
+          <p className="mt-2 text-4xl font-bold text-[#FF6B00]">${estimatedSavings.toLocaleString()}</p>
+          <p className="mt-2 text-xs text-zinc-500">
+            Based on ~{Math.round(rate * 100)}% effective tax rate for your work type. Actual savings depend on your receipts and tax situation.
+          </p>
+          <p className="mt-4 text-sm text-zinc-400">
+            💡 That&apos;s ${Math.round(estimatedSavings / 12).toLocaleString()}/month back in your pocket. Scan your receipts with TaxSnapper to capture every deduction.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}

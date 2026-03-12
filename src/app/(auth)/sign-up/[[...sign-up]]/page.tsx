@@ -1,12 +1,21 @@
 import { SignUp } from "@clerk/nextjs";
+import Link from "next/link";
 
-export default function SignUpPage() {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ goPro?: string }>;
+}) {
+  const params = await searchParams;
+  const goPro = params?.goPro === "1";
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0a0a0a] p-6">
       <SignUp
+        fallbackRedirectUrl={goPro ? "/go-pro" : "/dashboard"}
         appearance={{
           variables: {
-            colorPrimary: "#22c55e",
+            colorPrimary: "#FF6B00",
             colorBackground: "#ffffff",
             colorText: "#0a0a0a",
             colorInputBackground: "#f8faf8",
@@ -14,6 +23,15 @@ export default function SignUpPage() {
           },
         }}
       />
+      <p className="mt-6 text-center text-sm text-zinc-500">
+        Want to pay immediately?{" "}
+        <Link
+          href="/sign-up?goPro=1"
+          className="text-[#FF6B00] underline hover:no-underline"
+        >
+          Skip to Pro
+        </Link>
+      </p>
     </div>
   );
 }

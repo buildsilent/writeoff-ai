@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { Suspense, useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { ScanResults } from '@/components/ScanResults';
@@ -9,7 +10,7 @@ import { Camera, FileText, Loader2 } from 'lucide-react';
 
 const FILE_INPUT_ID = 'receipt-file-input';
 
-export default function ScanPage() {
+function ScanContent() {
   const [mode, setMode] = useState<'upload' | 'paste'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState('');
@@ -18,7 +19,13 @@ export default function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [checkoutCanceled, setCheckoutCanceled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('canceled') === '1') setCheckoutCanceled(true);
+  }, [searchParams]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
@@ -107,6 +114,11 @@ export default function ScanPage() {
         <p className="mt-1 text-zinc-500">
           Upload a photo or paste the receipt text below
         </p>
+        {checkoutCanceled && (
+          <p className="mt-3 text-sm text-zinc-500">
+            Checkout was canceled. Upgrade anytime when you&apos;re ready.
+          </p>
+        )}
 
         <div className="mt-8 flex gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-1">
           <button
@@ -177,7 +189,7 @@ export default function ScanPage() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Paste your receipt text here..."
-              className="min-h-[200px] w-full rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-white placeholder:text-zinc-600 focus:border-[#22c55e] focus:outline-none focus:ring-1 focus:ring-[#22c55e]"
+              className="min-h-[200px] w-full rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-white placeholder:text-zinc-600 focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
               rows={8}
             />
           )}
@@ -191,7 +203,7 @@ export default function ScanPage() {
           onClick={handleSubmit}
           disabled={loading}
           type="button"
-          className="btn-primary mt-8 flex w-full items-center justify-center gap-2 rounded-lg bg-[#22c55e] py-3.5 text-sm font-medium text-black disabled:opacity-50"
+          className="btn-primary mt-8 flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF6B00] py-3.5 text-sm font-medium text-black disabled:opacity-50"
         >
           {loading ? (
             <>
@@ -221,6 +233,18 @@ export default function ScanPage() {
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
+  );
+}
+
+export default function ScanPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#FF6B00] border-t-transparent" />
+      </div>
+    }>
+      <ScanContent />
+    </Suspense>
   );
 }
 

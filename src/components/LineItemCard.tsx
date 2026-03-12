@@ -34,9 +34,9 @@ export function LineItemCard({ item, merchantName, date }: LineItemCardProps) {
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <p className="text-lg font-semibold text-[#22c55e]">${item.amount.toFixed(2)}</p>
+          <p className="text-lg font-semibold text-[#FF6B00]">${item.amount.toFixed(2)}</p>
           {item.is_deductible ? (
-            <span className="flex items-center gap-1 rounded-full bg-[#22c55e]/10 px-2 py-0.5 text-xs font-medium text-[#22c55e]">
+            <span className="flex items-center gap-1 rounded-full bg-[#FF6B00]/10 px-2 py-0.5 text-xs font-medium text-[#FF6B00]">
               <Check className="h-3 w-3" />
               {item.deduction_percent}%
             </span>

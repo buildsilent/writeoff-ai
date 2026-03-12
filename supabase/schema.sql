@@ -1,4 +1,4 @@
--- WriteOff AI Database Schema for Supabase
+-- TaxSnapper Database Schema for Supabase
 
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";

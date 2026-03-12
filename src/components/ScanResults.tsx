@@ -24,7 +24,7 @@ interface ScanResultsProps {
   saved?: boolean;
 }
 
-const DISCLAIMER = 'WriteOff AI provides estimates for informational purposes. Consult a licensed CPA for official tax advice.';
+const DISCLAIMER = 'TaxSnapper provides estimates for informational purposes. Consult a licensed CPA for official tax advice.';
 
 export function ScanResults({ result, saved }: ScanResultsProps) {
   return (
@@ -50,7 +50,7 @@ export function ScanResults({ result, saved }: ScanResultsProps) {
       </div>
 
       {saved && (
-        <p className="text-center text-sm text-[#22c55e]">Saved to your history</p>
+        <p className="text-center text-sm text-[#FF6B00]">Saved to your history</p>
       )}
     </div>
   );

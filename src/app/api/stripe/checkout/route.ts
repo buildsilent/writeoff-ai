@@ -35,7 +35,7 @@ export async function POST() {
       });
       customerId = customer.id;
       await getSupabaseAdmin().from('subscriptions').upsert(
-        { user_id: userId, stripe_customer_id: customerId },
+        { user_id: userId, stripe_customer_id: customerId, status: 'incomplete' },
         { onConflict: 'user_id' }
       );
     }

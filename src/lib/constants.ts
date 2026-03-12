@@ -32,7 +32,7 @@ export function getConfidenceLabel(confidence: number): 'High' | 'Medium' | 'Low
 }
 
 export function getConfidenceColor(confidence: number): string {
-  if (confidence >= 0.8) return 'text-[#22c55e]';
+  if (confidence >= 0.8) return 'text-[#FF6B00]';
   if (confidence >= 0.5) return 'text-yellow-400';
   return 'text-red-400';
 }

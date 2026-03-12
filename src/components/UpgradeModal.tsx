@@ -80,7 +80,7 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
             onClick={handleUpgrade}
             type="button"
             disabled={loading}
-            className="btn-primary flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#22c55e] py-2.5 text-sm font-medium text-black disabled:opacity-50"
+            className="btn-primary flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#FF6B00] py-2.5 text-sm font-medium text-black disabled:opacity-50"
           >
             {loading ? (
               <>

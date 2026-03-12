@@ -11,9 +11,15 @@ export function Header() {
           href="/"
           className="text-sm font-medium text-white transition-opacity hover:opacity-80"
         >
-          WriteOff AI
+          TaxSnapper
         </Link>
         <nav className="flex items-center gap-1">
+          <Link
+            href="/#pricing"
+            className="rounded-lg px-4 py-2 text-sm text-zinc-400 transition-colors hover:text-white"
+          >
+            Pricing
+          </Link>
           <Show when="signed-out">
             <Link
               href="/sign-in"
@@ -23,7 +29,7 @@ export function Header() {
             </Link>
             <Link
               href="/sign-up"
-              className="ml-2 rounded-lg bg-[#22c55e] px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90"
+              className="ml-2 rounded-lg bg-[#FF6B00] px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90"
             >
               Get started
             </Link>
@@ -37,7 +43,7 @@ export function Header() {
             </Link>
             <Link
               href="/scan"
-              className="relative z-10 ml-2 cursor-pointer rounded-lg bg-[#22c55e] px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90"
+              className="relative z-10 ml-2 cursor-pointer rounded-lg bg-[#FF6B00] px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90"
             >
               Scan receipt
             </Link>
