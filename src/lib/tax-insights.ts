@@ -3,10 +3,14 @@
  * All numbers and rules current for tax year 2025.
  */
 
+import { getDeductibleAmountCents } from '@/lib/deductions';
+
 export interface ScanForInsights {
   id: string;
+  amount?: number;
   date: string | null;
   created_at: string;
+  is_deductible?: boolean;
   raw_data?: {
     line_items?: Array<{
       amount: number;
@@ -44,18 +48,7 @@ const COMMON_CATEGORIES = [
 ];
 
 function getDeductionCents(scan: ScanForInsights): number {
-  const raw = scan.raw_data;
-  const items = raw?.line_items ?? [];
-  let cents = 0;
-  for (const li of items) {
-    if (li.is_deductible) {
-      const amt = Number(li.amount) || 0;
-      const amtCents = amt >= 100 ? amt : Math.round(amt * 100);
-      const pct = li.deduction_percent ?? 100;
-      cents += Math.round(amtCents * (pct / 100));
-    }
-  }
-  return cents;
+  return getDeductibleAmountCents(scan, true);
 }
 
 function getCategorySet(scans: ScanForInsights[]): Set<string> {

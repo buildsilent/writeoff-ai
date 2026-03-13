@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { type, imageBase64, text, followUpAnswer, originalText, categoryHint } = body;
+    const { type, imageBase64, text, followUpAnswer, originalText, categoryHint, clientLocalDate } = body;
 
     if (!type || (type !== 'image' && type !== 'text')) {
       return NextResponse.json({ error: 'Invalid type. Use "image" or "text"' }, { status: 400 });
@@ -111,9 +111,12 @@ export async function POST(req: NextRequest) {
 
     const lineItems = result.line_items ?? [];
     const firstItem = lineItems[0];
+    // Use receipt's printed date if found; otherwise user's local date (clientLocalDate) to avoid UTC off-by-one for US users
     const dateStr = result.date && /^\d{4}-\d{2}-\d{2}/.test(String(result.date))
       ? String(result.date).slice(0, 10)
-      : new Date().toISOString().slice(0, 10);
+      : (typeof clientLocalDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(clientLocalDate)
+          ? clientLocalDate
+          : new Date().toISOString().slice(0, 10));
     // Store amounts in cents (OpenAI returns dollars) for consistency across DB and UI
     const amountCents = Math.round((result.total_amount ?? 0) * 100);
     const rawDataNormalized = {
@@ -211,7 +214,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json(result);
+    // Return response with amounts in CENTS - single source of truth for all clients
+    const responseWithCents = {
+      ...result,
+      total_amount: amountCents,
+      line_items: rawDataNormalized.line_items,
+    };
+    return NextResponse.json(responseWithCents);
   } catch (err) {
     console.error('Scan error:', err);
     return NextResponse.json(

@@ -6,10 +6,11 @@ import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { AppFooter } from '@/components/AppFooter';
 import { useScansRealtime } from '@/hooks/useScansRealtime';
-import { Camera, Loader2, Download } from 'lucide-react';
+import { Camera, Loader2, Download, Lock } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
 import { getCategoryEmoji } from '@/lib/constants';
 import { formatCents } from '@/lib/format';
+import { getDeductibleAmountCents, getTaxSavingsCents } from '@/lib/deductions';
 import {
   computeTaxHealthScore,
   computeYearOverYear,
@@ -121,39 +122,33 @@ function DashboardContent() {
       return d.getFullYear() === thisYear;
     });
 
-    let totalDed = 0;
     const catTotals = new Map<string, number>();
     const monthTotals = new Map<number, number>();
 
     for (const s of yearScans) {
+      const scanDed = getDeductibleAmountCents(s as { amount: number; is_deductible?: boolean; raw_data?: { line_items?: Array<{ amount: number; is_deductible?: boolean; deduction_percent?: number; irs_category?: string }> } }, true);
       const raw = s.raw_data as Scan['raw_data'];
       const items = raw?.line_items;
       if (items) {
         for (const li of items) {
           if (li.is_deductible) {
-            const amt = li.amount * (li.deduction_percent / 100);
-            totalDed += amt;
+            const amt = Math.round((li.amount ?? 0) * ((li.deduction_percent ?? 100) / 100));
             const cat = li.irs_category || 'Other';
             catTotals.set(cat, (catTotals.get(cat) || 0) + amt);
           }
         }
       } else if (s.raw_data && (s.raw_data as { is_deductible?: boolean }).is_deductible) {
-        totalDed += Number(s.amount);
         const cat = (s.raw_data as { irs_category?: string }).irs_category || 'Other';
-        catTotals.set(cat, (catTotals.get(cat) || 0) + Number(s.amount));
+        catTotals.set(cat, (catTotals.get(cat) || 0) + scanDed);
       }
 
       const d = (s.date || s.created_at?.slice(0, 10)) ? new Date(s.date || s.created_at!) : new Date();
       const m = d.getMonth();
-      const existing = monthTotals.get(m) || 0;
-      const scanDed = items
-        ? items.reduce((s, li) => s + (li.is_deductible ? li.amount * (li.deduction_percent / 100) : 0), 0)
-        : Number(s.amount);
-      monthTotals.set(m, existing + scanDed);
+      monthTotals.set(m, (monthTotals.get(m) || 0) + scanDed);
     }
 
+    const totalDed = yearScans.reduce((sum, s) => sum + getDeductibleAmountCents(s as Parameters<typeof getDeductibleAmountCents>[0], true), 0);
     const biggest = Array.from(catTotals.entries()).sort(([, a], [, b]) => b - a)[0];
-    const estRate = 0.25;
 
     // Streak: weeks in a row with at least one scan
     const sortedDates = scans
@@ -182,7 +177,7 @@ function DashboardContent() {
     return {
       totalScans: yearScans.length,
       totalDeductions: totalDed,
-      estimatedSaved: totalDed * estRate,
+      estimatedSaved: getTaxSavingsCents(totalDed),
       biggestCategory: biggest?.[0] || '—',
       biggestAmount: biggest?.[1] || 0,
       monthlyData: Array.from({ length: 12 }, (_, i) => monthTotals.get(i) || 0),
@@ -242,79 +237,59 @@ function DashboardContent() {
           </div>
         )}
 
-        <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-500">Your tax deduction insights</p>
-
         <EmailDigestBanner />
 
-        {/* Quick scan + Export */}
-        <div className="mt-8 flex flex-wrap gap-3">
+        {/* ABOVE THE FOLD — what matters most */}
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-[16px] border-2 border-[#4F46E5]/30 bg-[#4F46E5]/10 p-6">
+            <p className="text-sm font-medium uppercase tracking-wider text-[#4F46E5]/90">Total deductions this year</p>
+            <p className="mt-2 text-4xl font-bold text-white sm:text-5xl">{formatCents(totalDeductions)}</p>
+          </div>
+          <div className="rounded-[16px] border-2 border-emerald-500/30 bg-emerald-500/10 p-6">
+            <p className="text-sm font-medium uppercase tracking-wider text-emerald-400/90">Estimated tax saved this year</p>
+            <p className="mt-2 text-4xl font-bold text-emerald-400 sm:text-5xl">{formatCents(estimatedSaved)}</p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-3 rounded-[12px] border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+            <span className={`text-2xl font-bold ${taxHealth.score >= 70 ? 'text-emerald-400' : taxHealth.score >= 40 ? 'text-amber-400' : 'text-zinc-400'}`}>
+              {taxHealth.score}
+            </span>
+            <span className="text-zinc-500">/100</span>
+            <span className="text-sm text-zinc-400">Tax health</span>
+          </div>
           <Link
             href="/scan"
-            className="btn-primary flex min-h-[56px] flex-1 cursor-pointer items-center justify-center gap-3 rounded-[12px] bg-[#4F46E5] py-4 font-semibold text-white shadow-[0_4px_20px_rgba(79,70,229,0.4)] transition-all hover:shadow-[0_6px_28px_rgba(79,70,229,0.5)] min-w-[200px]"
+            className="btn-primary flex min-h-[52px] cursor-pointer items-center justify-center gap-2 rounded-[12px] bg-[#4F46E5] px-6 font-semibold text-white shadow-[0_4px_20px_rgba(79,70,229,0.4)] transition-all hover:shadow-[0_6px_28px_rgba(79,70,229,0.5)]"
           >
-            <Camera className="h-6 w-6" />
+            <Camera className="h-5 w-5" />
             Scan a receipt
           </Link>
           <button
             type="button"
             onClick={() => setShowExportModal(true)}
-            className="flex min-h-[56px] cursor-pointer items-center justify-center gap-3 rounded-[12px] border border-white/[0.12] bg-white/[0.02] px-6 py-4 font-semibold text-white transition-all hover:bg-white/[0.06]"
+            className="flex min-h-[52px] cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-white/[0.12] bg-white/[0.02] px-6 font-semibold text-white transition-all hover:bg-white/[0.06]"
           >
-            <Download className="h-6 w-6" />
+            <Download className="h-5 w-5" />
             Export
           </button>
         </div>
 
-        {/* Tax health score */}
-        <div className="mt-8 rounded-[12px] border border-[#4F46E5]/20 bg-[#4F46E5]/5 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white">Tax health score</p>
-              <p className="text-xs text-zinc-500">Based on consistency, categories, and gaps</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className={`text-3xl font-bold ${
-                  taxHealth.score >= 70 ? 'text-emerald-400' : taxHealth.score >= 40 ? 'text-amber-400' : 'text-zinc-400'
-                }`}
-              >
-                {taxHealth.score}
-              </span>
-              <span className="text-zinc-500">/100</span>
-            </div>
+        {/* SnapPoints teaser */}
+        <div className="mt-6 flex items-center gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4 opacity-70">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-zinc-700/50">
+            <Lock className="h-6 w-6 text-zinc-500" />
           </div>
-          {taxHealth.recommendations.length > 0 && (
-            <div className="mt-3 space-y-1">
-              {taxHealth.recommendations.slice(0, 2).map((rec, i) => (
-                <p key={i} className="text-sm text-amber-200/90">
-                  → {rec}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Tax projection + quarterly */}
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Tax saving projection</p>
-            <p className="mt-2 text-sm text-white">{taxProjection.message}</p>
-          </div>
-          <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Estimated quarterly tax</p>
-            <p className="mt-2 text-sm text-white">{quarterlyTax.message}</p>
+          <div>
+            <p className="font-medium text-zinc-400">SnapPoints Rewards — Coming Soon</p>
+            <p className="text-sm text-zinc-500">Earn points for every receipt you scan. Redeem for gift cards and cash.</p>
           </div>
         </div>
 
-        {/* Year over year */}
-        {yearOverYear.message && (
-          <div className="mt-4 rounded-[12px] border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-            <p className="text-sm text-emerald-200">{yearOverYear.message}</p>
-          </div>
-        )}
-
-        {/* Annual summary */}
+        {/* BELOW THE FOLD */}
+        <div className="mt-12 border-t border-white/[0.06] pt-8">
+        <h2 className="text-lg font-semibold text-white">Details</h2>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Total scans {thisYear}</p>
@@ -419,10 +394,28 @@ function DashboardContent() {
           </div>
         )}
 
+        {/* Tax projection + quarterly + year over year */}
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Tax saving projection</p>
+            <p className="mt-2 text-sm text-white">{taxProjection.message}</p>
+          </div>
+          <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Estimated quarterly tax</p>
+            <p className="mt-2 text-sm text-white">{quarterlyTax.message}</p>
+          </div>
+        </div>
+        {yearOverYear.message && (
+          <div className="mt-4 rounded-[12px] border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+            <p className="text-sm text-emerald-200">{yearOverYear.message}</p>
+          </div>
+        )}
+
         {/* Tip of the day */}
-        <div className="mt-8 rounded-[12px] border border-amber-500/20 bg-amber-500/5 p-4">
+        <div className="mt-6 rounded-[12px] border border-amber-500/20 bg-amber-500/5 p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-amber-400/90">Tip of the day</p>
           <p className="mt-2 text-sm text-amber-100/90 leading-relaxed">{CPA_TIPS[tipIndex]}</p>
+        </div>
         </div>
       </main>
       <AppFooter />

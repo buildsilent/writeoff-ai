@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { getCategoryEmoji, getConfidenceLabel, getConfidenceColor } from '@/lib/constants';
 import { formatCents } from '@/lib/format';
+import { getDeductibleAmountCents } from '@/lib/deductions';
 
 interface LineItem {
   description: string;
@@ -72,14 +73,7 @@ function getConfidenceScore(scan: Scan): number {
 }
 
 function getDeductionAmountCents(scan: Scan): number {
-  const raw = scan.raw_data as Scan['raw_data'];
-  if (raw?.line_items) {
-    return raw.line_items.reduce((sum, li) => {
-      if (li.is_deductible) return sum + li.amount * (li.deduction_percent / 100);
-      return sum;
-    }, 0);
-  }
-  return scan.is_deductible ? Number(scan.amount) : 0;
+  return getDeductibleAmountCents(scan, true);
 }
 
 function isPhotoScan(scan: Scan): boolean {

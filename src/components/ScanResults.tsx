@@ -27,14 +27,10 @@ interface ScanResultsProps {
 
 const DISCLAIMER = 'TaxSnapper provides estimates for informational purposes. Consult a licensed CPA for official tax advice.';
 
-// Normalize amounts to cents (OpenAI returns dollars)
-function toCents(dollars: number): number {
-  return Math.round((dollars ?? 0) * 100);
-}
-
+// API returns amounts in cents (single source of truth)
 export function ScanResults({ result, saved }: ScanResultsProps) {
-  const totalCents = toCents(result.total_amount);
-  const lineItemsCents = result.line_items.map((li) => ({ ...li, amount: toCents(li.amount) }));
+  const totalCents = Number(result.total_amount) ?? 0;
+  const lineItemsCents = result.line_items.map((li) => ({ ...li, amount: Number(li.amount) ?? 0 }));
 
   return (
     <div className="mt-12 space-y-6">

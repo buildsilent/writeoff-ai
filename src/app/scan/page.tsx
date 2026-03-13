@@ -143,12 +143,15 @@ function ScanContent() {
     if (mode === 'paste' && !followUpQuestion) setPendingText(originalTextForRequest);
 
     const hintVal = categoryHint && categoryHint !== 'Not Sure' ? categoryHint : undefined;
+    const now = new Date();
+    const clientLocalDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const base = { categoryHint: hintVal, clientLocalDate };
     const body: Record<string, unknown> =
       mode === 'upload'
-        ? { type: 'image', imageBase64: await fileToBase64(file!), categoryHint: hintVal }
+        ? { ...base, type: 'image', imageBase64: await fileToBase64(file!) }
         : followUpQuestion
-          ? { type: 'text', originalText: pendingText, followUpAnswer: text.trim(), categoryHint: hintVal }
-          : { type: 'text', text: originalTextForRequest, categoryHint: hintVal };
+          ? { ...base, type: 'text', originalText: pendingText, followUpAnswer: text.trim() }
+          : { ...base, type: 'text', text: originalTextForRequest };
 
     setLoading(true);
 
@@ -499,7 +502,7 @@ function ScanContent() {
               <ReceiptRequirementsReminder
                 merchantName={result.merchant_name || ''}
                 date={result.date || null}
-                amount={Math.round((result.total_amount ?? 0) * 100)}
+                amount={Number(result.total_amount) ?? 0}
                 hasDeductibleItems={(result.line_items as Array<{ is_deductible?: boolean }>).some((li) => li.is_deductible)}
               />
             </div>

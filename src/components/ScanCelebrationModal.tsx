@@ -5,6 +5,7 @@ import Link from 'next/link';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, Receipt, Share2 } from 'lucide-react';
 import { formatCents } from '@/lib/format';
+import { getDeductionStatsFromLineItems } from '@/lib/deductions';
 
 interface LineItem {
   amount: number;
@@ -111,20 +112,8 @@ export function ScanCelebrationModal({
   );
 }
 
+/** Uses lib/deductions - API returns amounts in cents */
 export function getDeductionStatsFromResult(result: { line_items?: LineItem[] }): { count: number; savingsCents: number } {
-  const items = result.line_items ?? [];
-  let count = 0;
-  let deductibleCents = 0;
-  for (const li of items) {
-    if (li.is_deductible) {
-      count++;
-      const amt = Number(li.amount) || 0;
-      const amtCents = amt >= 100 ? amt : Math.round(amt * 100);
-      const pct = li.deduction_percent ?? 100;
-      deductibleCents += Math.round(amtCents * (pct / 100));
-    }
-  }
-  const estTaxRate = 0.25;
-  const taxSavingsCents = Math.round(deductibleCents * estTaxRate);
-  return { count, savingsCents: taxSavingsCents };
+  const stats = getDeductionStatsFromLineItems(result.line_items ?? [], true);
+  return { count: stats.count, savingsCents: stats.taxSavingsCents };
 }
