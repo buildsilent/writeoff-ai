@@ -60,3 +60,6 @@ create index if not exists scans_irs_category_idx on scans(irs_category);
 -- Note: We use Clerk for auth and Supabase service role for server-side access.
 -- RLS is disabled for scans/subscriptions when using service role (bypasses RLS).
 -- Application logic in API routes enforces user_id filtering.
+
+-- Enable Realtime for scans (run in Supabase SQL Editor if not already enabled):
+-- ALTER PUBLICATION supabase_realtime ADD TABLE scans;

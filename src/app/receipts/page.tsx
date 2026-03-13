@@ -1,23 +1,22 @@
 'use client';
 
-// Data is PERMANENT. Never delete. Never archive. Show everything forever.
-
 import { Suspense, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { AppFooter } from '@/components/AppFooter';
 import { ReceiptDetailModal } from '@/components/ReceiptDetailModal';
+import { useScansRealtime } from '@/hooks/useScansRealtime';
 import {
   Folder,
   ChevronDown,
   ChevronRight,
   Search,
   Download,
-  Upload,
+  FileText,
   Camera,
   Loader2,
 } from 'lucide-react';
-import { getCategoryEmoji } from '@/lib/constants';
+import { getCategoryEmoji, getConfidenceLabel, getConfidenceColor } from '@/lib/constants';
 
 interface LineItem {
   description: string;
@@ -51,11 +50,21 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+type DateRangeFilter = 'today' | 'this_week' | 'this_month' | 'this_year' | 'all_time';
+type AmountSort = 'low_to_high' | 'high_to_low';
+type TypeFilter = 'all' | 'photo' | 'text';
+
 function getPrimaryCategory(scan: Scan): string {
   const raw = scan.raw_data as Scan['raw_data'];
   const first = raw?.line_items?.[0];
   if (first?.irs_category) return first.irs_category;
   return scan.irs_category || (scan.is_deductible ? 'Other' : 'Not Deductible');
+}
+
+function getConfidenceScore(scan: Scan): number {
+  const raw = scan.raw_data as Scan['raw_data'];
+  const first = raw?.line_items?.[0];
+  return first?.confidence ?? 0.8;
 }
 
 function getDeductionAmount(scan: Scan): number {
@@ -67,6 +76,10 @@ function getDeductionAmount(scan: Scan): number {
     }, 0);
   }
   return scan.is_deductible ? Number(scan.amount) : 0;
+}
+
+function isPhotoScan(scan: Scan): boolean {
+  return Boolean(scan.receipt_image_url);
 }
 
 function buildCabinet(scans: Scan[]): Map<number, Map<number, Map<string, Scan[]>>> {
@@ -103,9 +116,6 @@ function matchesSearch(scan: Scan, q: string): boolean {
   return false;
 }
 
-type FilterMode = 'all' | 'this_year' | 'this_month' | 'by_category';
-type SortMode = 'newest' | 'oldest' | 'highest_amount' | 'most_deductions';
-
 function CollapsibleFolder({
   label,
   emoji,
@@ -138,14 +148,60 @@ function CollapsibleFolder({
   );
 }
 
+function ReceiptCard({ scan, onClick }: { scan: Scan; onClick: () => void }) {
+  const raw = scan.raw_data as Scan['raw_data'];
+  const merchant = raw?.merchant_name || scan.merchant_name || 'Unknown';
+  const date = raw?.date || scan.date || scan.created_at?.slice(0, 10) || '';
+  const ded = getDeductionAmount(scan);
+  const cat = getPrimaryCategory(scan);
+  const emoji = getCategoryEmoji(cat);
+  const confidence = getConfidenceScore(scan);
+  const confidenceLabel = getConfidenceLabel(confidence);
+  const confidenceColor = getConfidenceColor(confidence);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-[44px] w-full cursor-pointer items-center gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4 text-left transition-colors hover:bg-white/[0.04] hover:shadow-[0_0_20px_rgba(79,70,229,0.1)]"
+    >
+      {scan.receipt_image_url ? (
+        <img
+          src={scan.receipt_image_url}
+          alt=""
+          className="h-14 w-14 shrink-0 rounded-[12px] object-cover"
+        />
+      ) : (
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] border border-white/[0.08] bg-white/[0.02]">
+          <FileText className="h-7 w-7 text-zinc-500" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium text-white">{merchant}</p>
+        <p className="text-xs text-zinc-500">{date || 'No date'}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="font-semibold text-[#4F46E5]">${Number(scan.amount).toFixed(2)}</p>
+        <p className="text-xs text-zinc-500">${ded.toFixed(2)} deductible</p>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-0.5">
+        <span className="text-xl">{emoji}</span>
+        <span className={`text-[10px] font-medium ${confidenceColor}`}>{confidenceLabel}</span>
+      </div>
+    </button>
+  );
+}
+
 function ReceiptsContent() {
-  const [scans, setScans] = useState<Scan[]>([]);
+  const { scans: scansData, loading, error } = useScansRealtime();
+  const scans = (scansData || []) as Scan[];
   const [usage, setUsage] = useState<{ hasSubscription: boolean } | null>(null);
-  const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<FilterMode>('all');
-  const [sort, setSort] = useState<SortMode>('newest');
+  const [dateRange, setDateRange] = useState<DateRangeFilter>('all_time');
+  const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [amountSort, setAmountSort] = useState<AmountSort>('high_to_low');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
@@ -153,70 +209,75 @@ function ReceiptsContent() {
   const [exporting, setExporting] = useState(false);
 
   const thisYear = new Date().getFullYear();
-  const thisMonth = new Date().getMonth();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekStart = new Date(today);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const yearStart = new Date(today.getFullYear(), 0, 1);
 
   useEffect(() => {
-    let isMounted = true;
-
-    Promise.all([
-      fetch('/api/scans').then(async (r) => {
-        if (r.status === 401 && isMounted) setAuthError(true);
-        return r.json();
-      }),
-      fetch('/api/usage').then(async (r) => {
-        if (r.ok) return r.json();
-        return { hasSubscription: false };
-      }),
-    ]).then(([scansData, usageData]) => {
-      if (!isMounted) return;
-      setScans(Array.isArray(scansData) ? scansData : []);
-      setUsage(usageData?.hasOwnProperty('hasSubscription') ? usageData : null);
-      setLoading(false);
-      const years = new Set<number>();
-      for (const s of Array.isArray(scansData) ? scansData : []) {
-        const d = (s.date || s.created_at?.slice(0, 10)) ? new Date(s.date || s.created_at) : new Date();
-        years.add(d.getFullYear());
-      }
-      if (years.size > 0) setExpandedYears(new Set([Math.max(...years)]));
-    });
-
-    return () => {
-      isMounted = false;
-    };
+    fetch('/api/usage')
+      .then(async (r) => {
+        if (r.status === 401) return { hasSubscription: false };
+        return r.ok ? r.json() : { hasSubscription: false };
+      })
+      .then((data) => setUsage(data?.hasOwnProperty('hasSubscription') ? data : null));
   }, []);
+
+  useEffect(() => {
+    if (error && !loading) setAuthError(true);
+  }, [error, loading]);
+
+  useEffect(() => {
+    const years = new Set<number>();
+    for (const s of scans) {
+      const d = (s.date || s.created_at?.slice(0, 10)) ? new Date(s.date || s.created_at) : new Date();
+      years.add(d.getFullYear());
+    }
+    if (years.size > 0 && expandedYears.size === 0) {
+      setExpandedYears(new Set([Math.max(...years)]));
+    }
+  }, [scans]);
 
   const filteredScans = useMemo(() => {
     let list = scans;
     if (searchQuery) list = list.filter((s) => matchesSearch(s, searchQuery));
-    if (filter === 'this_year') list = list.filter((s) => {
-      const d = (s.date || s.created_at?.slice(0, 10)) ? new Date(s.date || s.created_at!) : new Date();
-      return d.getFullYear() === thisYear;
-    });
-    if (filter === 'this_month') list = list.filter((s) => {
-      const d = (s.date || s.created_at?.slice(0, 10)) ? new Date(s.date || s.created_at!) : new Date();
-      return d.getFullYear() === thisYear && d.getMonth() === thisMonth;
-    });
-    const cmp = (a: Scan, b: Scan) => {
-      const da = new Date(a.created_at).getTime();
-      const db = new Date(b.created_at).getTime();
+    if (categoryFilter && categoryFilter !== 'All') {
+      list = list.filter((s) => getPrimaryCategory(s) === categoryFilter);
+    }
+    if (typeFilter === 'photo') list = list.filter((s) => isPhotoScan(s));
+    if (typeFilter === 'text') list = list.filter((s) => !isPhotoScan(s));
+    if (dateRange !== 'all_time') {
+      list = list.filter((s) => {
+        const d = (s.date || s.created_at?.slice(0, 10)) ? new Date(s.date || s.created_at!) : new Date();
+        const t = d.getTime();
+        switch (dateRange) {
+          case 'today': return t >= today.getTime();
+          case 'this_week': return t >= weekStart.getTime();
+          case 'this_month': return t >= monthStart.getTime();
+          case 'this_year': return t >= yearStart.getTime();
+          default: return true;
+        }
+      });
+    }
+    list = [...list].sort((a, b) => {
       const amtA = Number(a.amount);
       const amtB = Number(b.amount);
-      const dedA = getDeductionAmount(a);
-      const dedB = getDeductionAmount(b);
-      switch (sort) {
-        case 'newest': return db - da;
-        case 'oldest': return da - db;
-        case 'highest_amount': return amtB - amtA;
-        case 'most_deductions': return dedB - dedA;
-        default: return db - da;
-      }
-    };
-    return [...list].sort(cmp);
-  }, [scans, searchQuery, filter, sort, thisYear, thisMonth]);
+      return amountSort === 'high_to_low' ? amtB - amtA : amtA - amtB;
+    });
+    return list;
+  }, [scans, searchQuery, categoryFilter, typeFilter, dateRange, amountSort]);
 
   const cabinet = useMemo(() => buildCabinet(filteredScans), [filteredScans]);
-  const grandTotal = useMemo(() => {
-    return scans.reduce((sum, s) => sum + getDeductionAmount(s), 0);
+  const grandTotal = useMemo(() => scans.reduce((sum, s) => sum + getDeductionAmount(s), 0), [scans]);
+  const years = Array.from(cabinet.keys()).sort((a, b) => b - a);
+  const hasReceipts = scans.length > 0;
+
+  const categoryOptions = useMemo(() => {
+    const cats = new Set<string>();
+    scans.forEach((s) => cats.add(getPrimaryCategory(s)));
+    return ['All', ...Array.from(cats).sort((a, b) => (a === 'Not Deductible' ? 1 : b === 'Not Deductible' ? -1 : a.localeCompare(b)))];
   }, [scans]);
 
   const handleExport = async () => {
@@ -245,16 +306,10 @@ function ReceiptsContent() {
         <main className="mx-auto flex flex-1 flex-col items-center justify-center px-6 py-12">
           <p className="text-center text-zinc-400">Sign in to view your receipts</p>
           <div className="mt-6 flex gap-4">
-            <Link
-              href="/sign-in"
-              className="btn-primary min-h-[44px] cursor-pointer rounded-[12px] bg-[#4F46E5] px-6 py-3 font-medium text-white"
-            >
+            <Link href="/sign-in" className="btn-primary min-h-[44px] cursor-pointer rounded-[12px] bg-[#4F46E5] px-6 py-3 font-medium text-white">
               Sign in
             </Link>
-            <Link
-              href="/sign-up"
-              className="min-h-[44px] cursor-pointer rounded-[12px] border border-white/[0.12] px-6 py-3 font-medium text-white"
-            >
+            <Link href="/sign-up" className="min-h-[44px] cursor-pointer rounded-[12px] border border-white/[0.12] px-6 py-3 font-medium text-white">
               Sign up
             </Link>
           </div>
@@ -276,16 +331,14 @@ function ReceiptsContent() {
     );
   }
 
-  const years = Array.from(cabinet.keys()).sort((a, b) => b - a);
-  const hasReceipts = scans.length > 0;
-
   return (
     <div className="flex min-h-screen flex-col bg-[#080B14]">
       <Header />
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="text-2xl font-semibold text-white">My Receipts</h1>
-        <p className="mt-1 text-sm text-zinc-500">All your receipts, organized forever</p>
+        <p className="mt-1 text-sm text-zinc-500">View and organize your saved receipts</p>
 
+        {/* Grand total banner */}
         {hasReceipts && (
           <div className="mt-6 rounded-[12px] border border-[#4F46E5]/20 bg-[#4F46E5]/5 p-4 sm:p-6">
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Total deductions (all time)</p>
@@ -293,6 +346,7 @@ function ReceiptsContent() {
           </div>
         )}
 
+        {/* Search + filters */}
         {hasReceipts && (
           <div className="mt-6 space-y-4">
             <div className="relative">
@@ -307,38 +361,46 @@ function ReceiptsContent() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {(['all', 'this_year', 'this_month', 'by_category'] as const).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFilter(f)}
-                  className={`min-h-[44px] cursor-pointer rounded-[12px] px-4 py-2 text-sm font-medium transition-colors ${
-                    filter === f
-                      ? 'bg-[#4F46E5] text-white'
-                      : 'border border-white/[0.12] text-zinc-400 hover:bg-white/[0.04] hover:text-white'
-                  }`}
-                >
-                  {f === 'all' ? 'All' : f === 'this_year' ? 'This Year' : f === 'this_month' ? 'This Month' : 'By Category'}
-                </button>
-              ))}
-            </div>
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value as DateRangeFilter)}
+                className="min-h-[44px] rounded-[12px] border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-sm text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+              >
+                <option value="all_time" className="bg-[#080B14]">All Time</option>
+                <option value="today" className="bg-[#080B14]">Today</option>
+                <option value="this_week" className="bg-[#080B14]">This Week</option>
+                <option value="this_month" className="bg-[#080B14]">This Month</option>
+                <option value="this_year" className="bg-[#080B14]">This Year</option>
+              </select>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-zinc-500">Sort:</span>
-              {(['newest', 'oldest', 'highest_amount', 'most_deductions'] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setSort(s)}
-                  className={`min-h-[44px] cursor-pointer rounded-[12px] px-3 py-2 text-sm font-medium transition-colors ${
-                    sort === s
-                      ? 'bg-white/[0.08] text-white'
-                      : 'text-zinc-500 hover:text-white'
-                  }`}
-                >
-                  {s === 'newest' ? 'Newest' : s === 'oldest' ? 'Oldest' : s === 'highest_amount' ? 'Highest Amount' : 'Most Deductions'}
-                </button>
-              ))}
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="min-h-[44px] rounded-[12px] border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-sm text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+              >
+                {categoryOptions.map((c) => (
+                  <option key={c} value={c} className="bg-[#080B14]">{c === 'All' ? 'All categories' : c}</option>
+                ))}
+              </select>
+
+              <select
+                value={amountSort}
+                onChange={(e) => setAmountSort(e.target.value as AmountSort)}
+                className="min-h-[44px] rounded-[12px] border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-sm text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+              >
+                <option value="high_to_low" className="bg-[#080B14]">Amount: High to Low</option>
+                <option value="low_to_high" className="bg-[#080B14]">Amount: Low to High</option>
+              </select>
+
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+                className="min-h-[44px] rounded-[12px] border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-sm text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+              >
+                <option value="all" className="bg-[#080B14]">All types</option>
+                <option value="photo" className="bg-[#080B14]">Photo scan</option>
+                <option value="text" className="bg-[#080B14]">Text entry</option>
+              </select>
             </div>
 
             {usage?.hasSubscription && (
@@ -355,33 +417,33 @@ function ReceiptsContent() {
           </div>
         )}
 
+        {/* Empty state */}
         {!hasReceipts && (
           <div className="mt-12 rounded-[12px] border border-dashed border-white/[0.12] p-12 text-center">
-            <Upload className="mx-auto h-12 w-12 text-zinc-600" />
-            <p className="mt-4 text-lg font-medium text-white">No receipts yet</p>
+            <FileText className="mx-auto h-12 w-12 text-zinc-600" />
+            <p className="mt-4 text-lg font-medium text-white">No receipts yet — Go scan your first receipt</p>
             <p className="mt-2 text-sm text-zinc-500">
-              Scan your first receipt to see it here. Your data is stored permanently and never deleted.
+              Your data is stored permanently and never deleted.
             </p>
-            <div className="mt-6 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <Link
-                href="/scan"
-                className="btn-primary flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[12px] bg-[#4F46E5] px-6 py-3 font-medium text-white shadow-[0_4px_14px_rgba(79,70,229,0.4)] transition-all hover:shadow-[0_4px_20px_rgba(79,70,229,0.5)]"
-              >
-                <Camera className="h-5 w-5" />
-                Go to Scan
-              </Link>
-            </div>
-            <p className="mt-6 text-sm text-zinc-500">↑ Tap the Scan tab in the menu to get started</p>
+            <Link
+              href="/scan"
+              className="btn-primary mt-6 inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[12px] bg-[#4F46E5] px-6 py-3 font-medium text-white shadow-[0_4px_14px_rgba(79,70,229,0.4)] transition-all hover:shadow-[0_4px_20px_rgba(79,70,229,0.5)]"
+            >
+              <Camera className="h-5 w-5" />
+              Scan your first receipt
+            </Link>
           </div>
         )}
 
+        {/* No matches */}
         {hasReceipts && filteredScans.length === 0 && (
           <div className="mt-12 rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-8 text-center">
             <p className="text-zinc-500">No receipts match your search or filters</p>
           </div>
         )}
 
-        {hasReceipts && filteredScans.length > 0 && filter !== 'by_category' && (
+        {/* Filing cabinet: Year → Month → IRS Category */}
+        {hasReceipts && filteredScans.length > 0 && (
           <div className="mt-10 space-y-3">
             {years.map((year) => {
               const byMonth = cabinet.get(year)!;
@@ -471,55 +533,6 @@ function ReceiptsContent() {
             })}
           </div>
         )}
-
-        {hasReceipts && filteredScans.length > 0 && filter === 'by_category' && (
-          <div className="mt-10">
-            {(() => {
-              const byCat = new Map<string, Scan[]>();
-              for (const s of filteredScans) {
-                const c = getPrimaryCategory(s);
-                if (!byCat.has(c)) byCat.set(c, []);
-                byCat.get(c)!.push(s);
-              }
-              const sortedCats = Array.from(byCat.keys()).sort((a, b) => {
-                if (a === 'Not Deductible') return 1;
-                if (b === 'Not Deductible') return -1;
-                return a.localeCompare(b);
-              });
-              return (
-                <div className="space-y-3">
-                  {sortedCats.map((cat) => {
-                    const arr = byCat.get(cat)!;
-                    const ded = arr.reduce((s, sc) => s + getDeductionAmount(sc), 0);
-                    const catKey = `cat-${cat}`;
-                    const isOpen = expandedCats.has(catKey);
-                    return (
-                      <CollapsibleFolder
-                        key={catKey}
-                        label={cat}
-                        emoji={getCategoryEmoji(cat)}
-                        total={ded}
-                        isOpen={isOpen}
-                        onToggle={() => setExpandedCats((s) => {
-                          const n = new Set(s);
-                          if (n.has(catKey)) n.delete(catKey);
-                          else n.add(catKey);
-                          return n;
-                        })}
-                      >
-                        <div className="space-y-3 pl-2">
-                          {arr.map((scan) => (
-                            <ReceiptCard key={scan.id} scan={scan} onClick={() => setSelectedScan(scan)} />
-                          ))}
-                        </div>
-                      </CollapsibleFolder>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-          </div>
-        )}
       </main>
 
       {selectedScan && (
@@ -528,44 +541,6 @@ function ReceiptsContent() {
 
       <AppFooter />
     </div>
-  );
-}
-
-function ReceiptCard({ scan, onClick }: { scan: Scan; onClick: () => void }) {
-  const raw = scan.raw_data as Scan['raw_data'];
-  const merchant = raw?.merchant_name || scan.merchant_name || 'Unknown';
-  const date = raw?.date || scan.date || scan.created_at?.slice(0, 10) || '';
-  const ded = getDeductionAmount(scan);
-  const cat = getPrimaryCategory(scan);
-  const emoji = getCategoryEmoji(cat);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-[44px] w-full cursor-pointer items-center gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4 text-left transition-colors hover:bg-white/[0.04] hover:shadow-[0_0_20px_rgba(79,70,229,0.1)]"
-    >
-      {scan.receipt_image_url ? (
-        <img
-          src={scan.receipt_image_url}
-          alt=""
-          className="h-14 w-14 shrink-0 rounded-lg object-cover"
-        />
-      ) : (
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.02]">
-          <span className="text-2xl">{emoji}</span>
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-white">{merchant}</p>
-        <p className="text-xs text-zinc-500">{date || 'No date'}</p>
-      </div>
-      <div className="shrink-0 text-right">
-        <p className="font-semibold text-[#4F46E5]">${Number(scan.amount).toFixed(2)}</p>
-        <p className="text-xs text-zinc-500">${ded.toFixed(2)} deductible</p>
-      </div>
-      <span className="shrink-0 text-xl">{emoji}</span>
-    </button>
   );
 }
 

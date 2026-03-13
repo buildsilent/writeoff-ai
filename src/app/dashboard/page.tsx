@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { AppFooter } from '@/components/AppFooter';
+import { useScansRealtime } from '@/hooks/useScansRealtime';
 import { Camera, Loader2 } from 'lucide-react';
 import { getCategoryEmoji } from '@/lib/constants';
 
@@ -49,59 +50,48 @@ const CPA_TIPS = [
 
 function DashboardContent() {
   const searchParams = useSearchParams();
-  const [scans, setScans] = useState<Scan[]>([]);
+  const { scans: scansData, loading: scansLoading, error: scansError } = useScansRealtime();
+  const scans = (scansData || []) as Scan[];
   const [usage, setUsage] = useState<Usage | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [usageLoading, setUsageLoading] = useState(true);
   const [upgradeSuccess, setUpgradeSuccess] = useState(false);
 
   const tipIndex = useMemo(() => Math.floor(Math.random() * CPA_TIPS.length), []);
-
   const [authError, setAuthError] = useState(false);
-
   const upgradedParam = searchParams?.get?.('upgraded') ?? null;
 
+  const loading = scansLoading || usageLoading;
+
   useEffect(() => {
-    let isMounted = true;
-    let pollTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    if (scansError && !scansLoading) setAuthError(true);
+  }, [scansError, scansLoading]);
 
-    const justUpgraded = upgradedParam === '1';
-
-    Promise.all([
-      fetch('/api/scans').then(async (r) => {
-        if (r.status === 401 && isMounted) setAuthError(true);
-        return r.json();
-      }),
-      fetch('/api/usage').then((r) => r.json()),
-    ]).then(([scansData, usageData]) => {
-      if (!isMounted) return;
-      setScans(Array.isArray(scansData) ? scansData : []);
-      setUsage(usageData?.hasOwnProperty('scanCount') ? usageData : null);
-      setLoading(false);
-      if (justUpgraded) setUpgradeSuccess(true);
-      if (justUpgraded && !usageData?.hasSubscription) {
-        let attempts = 0;
-        const poll = () => {
-          if (!isMounted) return;
-          attempts++;
-          fetch('/api/usage')
-            .then((r) => r.json())
-            .then((u) => {
-              if (!isMounted) return;
-              if (u?.hasSubscription) setUsage(u);
-              else if (attempts < 5) {
-                pollTimeoutId = setTimeout(poll, 2000);
-              }
-            });
-        };
-        pollTimeoutId = setTimeout(poll, 2000);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      if (pollTimeoutId) clearTimeout(pollTimeoutId);
-    };
+  useEffect(() => {
+    fetch('/api/usage')
+      .then((r) => r.json())
+      .then((usageData) => {
+        setUsage(usageData?.hasOwnProperty('scanCount') ? usageData : null);
+        if (upgradedParam === '1') setUpgradeSuccess(true);
+      })
+      .finally(() => setUsageLoading(false));
   }, [upgradedParam]);
+
+  useEffect(() => {
+    if (upgradedParam !== '1' || !usage) return;
+    if (usage.hasSubscription) return;
+    let attempts = 0;
+    const poll = () => {
+      attempts++;
+      fetch('/api/usage')
+        .then((r) => r.json())
+        .then((u) => {
+          if (u?.hasSubscription) setUsage(u);
+          else if (attempts < 5) setTimeout(poll, 2000);
+        });
+    };
+    const id = setTimeout(poll, 2000);
+    return () => clearTimeout(id);
+  }, [upgradedParam, usage]);
 
   const thisYear = new Date().getFullYear();
   const { totalScans, totalDeductions, estimatedSaved, biggestCategory, monthlyData, categoryData, streakWeeks } = useMemo(() => {
