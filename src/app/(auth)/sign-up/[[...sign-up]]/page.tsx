@@ -33,6 +33,9 @@ export default async function SignUpPage({
           Skip to Pro
         </Link>
       </p>
+      <p className="mt-3 text-center text-xs text-zinc-500">
+        We&apos;ll ask if you want weekly tax tips in your inbox after you sign up.
+      </p>
     </div>
   );
 }

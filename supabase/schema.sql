@@ -57,6 +57,14 @@ create index if not exists scans_created_at_idx on scans(created_at desc);
 create index if not exists scans_date_idx on scans(date);
 create index if not exists scans_irs_category_idx on scans(irs_category);
 
+-- User preferences (e.g. weekly email digest)
+create table if not exists user_preferences (
+  user_id text primary key,
+  weekly_tax_tip_email boolean default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- Note: We use Clerk for auth and Supabase SERVICE ROLE for server-side access.
 -- The service role key BYPASSES RLS entirely. API routes must use getSupabaseAdmin()
 -- which requires SUPABASE_SERVICE_ROLE_KEY. Never use the anon key for server queries.

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { AppFooter } from '@/components/AppFooter';
 import { ScanResults } from '@/components/ScanResults';
+import { ScanCelebrationModal, getDeductionStatsFromResult } from '@/components/ScanCelebrationModal';
 import { LineItemCard } from '@/components/LineItemCard';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { Camera, FileText, Loader2, RotateCcw, CheckCircle2, Receipt, LayoutDashboard } from 'lucide-react';
@@ -51,6 +52,7 @@ function ScanContent() {
   const [error, setError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [checkoutCanceled, setCheckoutCanceled] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
@@ -163,6 +165,7 @@ function ScanContent() {
         if (res.ok && res.result) {
           setResult(res.result);
           setSaved(true);
+          setShowCelebration(true);
           setFollowUpQuestion(null);
           notifyScanComplete();
           return;
@@ -234,6 +237,7 @@ function ScanContent() {
       }
       setResult(data);
       setSaved(true);
+      setShowCelebration(true);
       setFollowUpQuestion(null);
       notifyScanComplete();
     } catch (err) {
@@ -265,6 +269,7 @@ function ScanContent() {
     setResult(null);
     setError(null);
     setFollowUpQuestion(null);
+    setShowCelebration(false);
   };
 
   return (
@@ -524,6 +529,15 @@ function ScanContent() {
               </div>
             </div>
           </div>
+        )}
+
+        {showCelebration && result && result.line_items && (
+          <ScanCelebrationModal
+            deductionCount={getDeductionStatsFromResult(result as Parameters<typeof getDeductionStatsFromResult>[0]).count}
+            estimatedSavingsCents={getDeductionStatsFromResult(result as Parameters<typeof getDeductionStatsFromResult>[0]).savingsCents}
+            onScanAnother={resetForNewScan}
+            onClose={() => setShowCelebration(false)}
+          />
         )}
       </main>
 

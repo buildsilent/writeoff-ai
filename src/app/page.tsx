@@ -7,6 +7,8 @@ import { AppFooter } from '@/components/AppFooter';
 import { ExampleScanCard } from '@/components/ExampleScanCard';
 import { PricingSection } from '@/components/PricingSection';
 import { SavingsCalculator } from '@/components/SavingsCalculator';
+import { TaxTipsTicker } from '@/components/TaxTipsTicker';
+import { LiveStatsCounter } from '@/components/LiveStatsCounter';
 import { Upload } from 'lucide-react';
 
 export default function LandingPage() {
@@ -51,9 +53,7 @@ export default function LandingPage() {
             Snap your receipts. Keep your money.
             Upload a photo or paste receipt text—get exact IRS categories in seconds.
           </p>
-          <p className="mt-4 text-sm text-zinc-500">
-            <span className="font-medium text-white">Trusted by 1,247 users</span> · 1,247 deductions found so far
-          </p>
+          <LiveStatsCounter />
           <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Show when="signed-in">
               <Link
@@ -81,6 +81,8 @@ export default function LandingPage() {
           </div>
           <p className="mt-3 text-xs text-zinc-500">3 free scans · No credit card required</p>
         </section>
+
+        <TaxTipsTicker />
 
         {/* Example result */}
         <section className="py-10 md:py-12">

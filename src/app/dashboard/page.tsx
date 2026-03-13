@@ -9,6 +9,7 @@ import { useScansRealtime } from '@/hooks/useScansRealtime';
 import { Camera, Loader2 } from 'lucide-react';
 import { getCategoryEmoji } from '@/lib/constants';
 import { formatCents } from '@/lib/format';
+import { EmailDigestBanner } from '@/components/EmailDigestBanner';
 
 interface LineItem {
   description: string;
@@ -225,6 +226,8 @@ function DashboardContent() {
         <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
         <p className="mt-1 text-sm text-zinc-500">Your tax deduction insights</p>
 
+        <EmailDigestBanner />
+
         {/* Quick scan - prominent */}
         <Link
           href="/scan"
@@ -253,6 +256,37 @@ function DashboardContent() {
             <p className="mt-1 text-lg font-semibold text-white">{getCategoryEmoji(biggestCategory)} {biggestCategory}</p>
           </div>
         </div>
+
+        {/* Milestone badges */}
+        {(() => {
+          const savedCents = Math.round(estimatedSaved);
+          const milestones = [
+            { threshold: 0, label: 'First Deduction Found', emoji: '🎯', key: 'first', check: totalDeductions > 0 },
+            { threshold: 10000, label: '$100 Saved', emoji: '💰', key: '100', check: true },
+            { threshold: 50000, label: '$500 Saved', emoji: '🔥', key: '500', check: true },
+            { threshold: 100000, label: '$1,000 Saved', emoji: '🏆', key: '1k', check: true },
+            { threshold: 500000, label: '$5,000 Saved', emoji: '👑', key: '5k', check: true },
+          ];
+          const unlocked = milestones.filter((m) =>
+            m.key === 'first' ? m.check : savedCents >= m.threshold
+          );
+          if (unlocked.length === 0) return null;
+          return (
+            <div className="mt-6 rounded-[12px] border border-amber-500/20 bg-amber-500/5 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-amber-400/90">Your milestones</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {unlocked.map((m) => (
+                  <span
+                    key={m.key}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-200"
+                  >
+                    {m.emoji} {m.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Streak */}
         <div className="mt-6 rounded-[12px] border border-[#4F46E5]/20 bg-[#4F46E5]/5 p-4">
