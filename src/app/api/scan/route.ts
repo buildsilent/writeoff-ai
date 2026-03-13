@@ -135,16 +135,53 @@ export async function POST(req: NextRequest) {
       receipt_image_url: receiptImageUrl,
     };
 
-    console.log('[scan API] insert scanRow userId=', userId, 'merchant=', scanRow.merchant_name, 'amountCents=', amountCents);
+    // Nuclear debug: BEFORE insert
+    const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '(missing)';
+    console.log('[scan API] === BEFORE INSERT ===');
+    console.log('[scan API] Using getSupabaseAdmin (SUPABASE_SERVICE_ROLE_KEY):', hasServiceRole, '| Supabase URL:', supabaseUrl);
+    console.log('[scan API] scanRow EXACT data:', JSON.stringify({
+      user_id: scanRow.user_id,
+      merchant_name: scanRow.merchant_name,
+      amount: scanRow.amount,
+      date: scanRow.date,
+      category: scanRow.category,
+      is_deductible: scanRow.is_deductible,
+      irs_category: scanRow.irs_category,
+      receipt_image_url: scanRow.receipt_image_url,
+      raw_data_keys: scanRow.raw_data ? Object.keys(scanRow.raw_data) : null,
+    }));
 
-    const { data: inserted, error: insertError } = await supabase
-      .from('scans')
-      .insert(scanRow)
-      .select('id')
-      .single();
+    let inserted: { id: string } | null = null;
+    let insertError: { message?: string; code?: string; details?: unknown } | null = null;
+    try {
+      const res = await supabase
+        .from('scans')
+        .insert(scanRow)
+        .select('id')
+        .single();
+      inserted = res.data;
+      insertError = res.error;
+    } catch (insertThrow) {
+      console.error('[scan API] INSERT THREW (unexpected):', insertThrow);
+      return NextResponse.json(
+        { error: 'SAVE_FAILED', message: 'Insert threw: ' + (insertThrow instanceof Error ? insertThrow.message : String(insertThrow)) },
+        { status: 500 }
+      );
+    }
+
+    // Nuclear debug: AFTER insert
+    console.log('[scan API] === AFTER INSERT ===');
+    console.log('[scan API] Supabase response:', JSON.stringify({
+      data: inserted,
+      error: insertError,
+      errorMessage: insertError?.message,
+      errorCode: insertError?.code,
+      errorDetails: insertError?.details,
+    }));
 
     if (insertError) {
-      console.error('[scan API] Supabase insert error:', insertError);
+      console.error('[scan API] Supabase insert FAILED:', insertError);
       return NextResponse.json(
         { error: 'SAVE_FAILED', message: 'Receipt was analyzed but could not be saved. Please try again.' },
         { status: 500 }

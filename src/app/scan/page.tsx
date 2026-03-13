@@ -10,6 +10,7 @@ import { LineItemCard } from '@/components/LineItemCard';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { Camera, FileText, Loader2, RotateCcw, CheckCircle2, Receipt, LayoutDashboard } from 'lucide-react';
 import { notifyScanComplete } from '@/hooks/useScansRealtime';
+import { useScanWorker } from '@/hooks/useScanWorker';
 
 const FILE_INPUT_ID = 'receipt-file-input';
 const PROGRESS_MESSAGES = [
@@ -58,6 +59,7 @@ function ScanContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const { ready: workerReady, runScan, requestNotificationPermission } = useScanWorker();
 
   // Stable dependency: only run when canceled param actually changes
   useEffect(() => {
@@ -137,21 +139,58 @@ function ScanContent() {
     const originalTextForRequest = mode === 'paste' && !followUpQuestion ? text.trim() : pendingText;
     if (mode === 'paste' && !followUpQuestion) setPendingText(originalTextForRequest);
 
-    // Cancel any in-flight scan
-    if (abortControllerRef.current) abortControllerRef.current.abort();
+    const hintVal = categoryHint && categoryHint !== 'Not Sure' ? categoryHint : undefined;
+    const body: Record<string, unknown> =
+      mode === 'upload'
+        ? { type: 'image', imageBase64: await fileToBase64(file!), categoryHint: hintVal }
+        : followUpQuestion
+          ? { type: 'text', originalText: pendingText, followUpAnswer: text.trim(), categoryHint: hintVal }
+          : { type: 'text', text: originalTextForRequest, categoryHint: hintVal };
+
+    setLoading(true);
+
+    // Background scan: use Service Worker so processing continues if user navigates away
+    if (workerReady && runScan) {
+      if (mode === 'upload') await requestNotificationPermission();
+      const sent = runScan(body, (res) => {
+        if (!isMountedRef.current) return;
+        setLoading(false);
+        if (res.ok && res.followUp) {
+          setFollowUpQuestion(res.followUp.followUpQuestion);
+          setText('');
+          return;
+        }
+        if (res.ok && res.result) {
+          setResult(res.result);
+          setSaved(true);
+          setFollowUpQuestion(null);
+          notifyScanComplete();
+          return;
+        }
+        const data = res.error as { error?: string; message?: string } | undefined;
+        if (data?.error === 'FREE_LIMIT_REACHED') setShowUpgrade(true);
+        else if (data?.error === 'RECEIPT_UNREADABLE') {
+          const attempts = failedAttempts + 1;
+          setFailedAttempts(attempts);
+          if (attempts >= 2) {
+            setMode('paste');
+            setText("No worries — just type what was on your receipt in plain English and we'll handle the rest.");
+          } else {
+            setError('We had trouble reading that receipt. Try taking the photo in better lighting or move closer.');
+          }
+        } else {
+          setError(data?.message || "Something went wrong. Let's try again.");
+        }
+      });
+      if (sent) return;
+    }
+
+    // Fallback: direct fetch (worker not ready or failed to send)
+    abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
-    setLoading(true);
     try {
-      const hintVal = categoryHint && categoryHint !== 'Not Sure' ? categoryHint : undefined;
-      const body: Record<string, unknown> =
-        mode === 'upload'
-          ? { type: 'image', imageBase64: await fileToBase64(file!), categoryHint: hintVal }
-          : followUpQuestion
-            ? { type: 'text', originalText: pendingText, followUpAnswer: text.trim(), categoryHint: hintVal }
-            : { type: 'text', text: originalTextForRequest, categoryHint: hintVal };
-
       const res = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -204,7 +243,7 @@ function ScanContent() {
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
-  }, [mode, file, text, followUpQuestion, pendingText, failedAttempts, categoryHint]);
+  }, [mode, file, text, followUpQuestion, pendingText, failedAttempts, categoryHint, workerReady, runScan, requestNotificationPermission]);
 
   const handleSwitchToText = () => {
     setMode('paste');
@@ -394,6 +433,9 @@ function ScanContent() {
                   {PROGRESS_MESSAGES[progressStep]}
                 </p>
               </div>
+              <p className="mt-4 text-xs text-zinc-500">
+                You can navigate away — we&apos;ll notify you when it&apos;s done.
+              </p>
               <button
                 type="button"
                 onClick={() => {
@@ -401,7 +443,7 @@ function ScanContent() {
                   setLoading(false);
                   setError(null);
                 }}
-                className="mt-6 text-sm text-zinc-500 hover:text-white"
+                className="mt-4 text-sm text-zinc-500 hover:text-white"
               >
                 Cancel scan
               </button>
