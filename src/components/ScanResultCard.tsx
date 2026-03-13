@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, X } from 'lucide-react';
+import { formatCents } from '@/lib/format';
 
 export interface ScanResult {
   merchant_name: string;
@@ -39,7 +40,7 @@ export function ScanResultCard({ result, onSave, saved }: ScanResultCardProps) {
         {result.merchant_name || 'Unknown merchant'}
       </h3>
       <p className="mt-0.5 text-2xl font-semibold text-[#4F46E5]">
-        ${typeof result.amount === 'number' ? result.amount.toFixed(2) : result.amount}
+        {typeof result.amount === 'number' ? formatCents(result.amount) : result.amount}
       </p>
       <div className="mt-4 space-y-2 text-sm">
         <p className="text-zinc-500"><span className="text-zinc-600">Date</span> {result.date || '—'}</p>

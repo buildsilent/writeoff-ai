@@ -12,13 +12,13 @@ export const supabase =
     ? createClient(supabaseUrl, supabaseAnonKey)
     : (null as unknown as SupabaseClient);
 
-// Admin client for server - bypasses RLS. Lazy init to avoid build-time env requirement.
+// Admin client for server - uses SERVICE ROLE to bypass RLS. Required for server-side queries.
 export function getSupabaseAdmin(): SupabaseClient {
   if (!_supabaseAdmin) {
-    if (!supabaseUrl || (!supabaseServiceKey && !supabaseAnonKey)) {
-      throw new Error('Supabase URL and keys are required. Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY.');
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase service role required. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. (Service role bypasses RLS.)');
     }
-    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
+    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
   }
   return _supabaseAdmin;
 }

@@ -57,9 +57,10 @@ create index if not exists scans_created_at_idx on scans(created_at desc);
 create index if not exists scans_date_idx on scans(date);
 create index if not exists scans_irs_category_idx on scans(irs_category);
 
--- Note: We use Clerk for auth and Supabase service role for server-side access.
--- RLS is disabled for scans/subscriptions when using service role (bypasses RLS).
--- Application logic in API routes enforces user_id filtering.
+-- Note: We use Clerk for auth and Supabase SERVICE ROLE for server-side access.
+-- The service role key BYPASSES RLS entirely. API routes must use getSupabaseAdmin()
+-- which requires SUPABASE_SERVICE_ROLE_KEY. Never use the anon key for server queries.
+-- If RLS is enabled on scans, it would block anon key; service role bypasses it.
 
 -- Enable Realtime for scans (run in Supabase SQL Editor if not already enabled):
 -- ALTER PUBLICATION supabase_realtime ADD TABLE scans;

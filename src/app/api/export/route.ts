@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { hasActiveSubscription } from '@/lib/subscription';
+import { centsToDollars } from '@/lib/format';
 
 export async function GET() {
   try {
@@ -41,7 +42,7 @@ export async function GET() {
             escapeCsv(merchantName),
             escapeCsv(String(date)),
             escapeCsv(String(item.description ?? '')),
-            String(item.amount ?? 0),
+            String(centsToDollars(item.amount ?? 0).toFixed(2)),
             escapeCsv(String(item.irs_category ?? '')),
             String(item.deduction_percent ?? 0),
             item.is_deductible ? 'Yes' : 'No',
@@ -53,7 +54,7 @@ export async function GET() {
           escapeCsv(merchantName),
           escapeCsv(String(date)),
           escapeCsv(merchantName),
-          String(scan.amount ?? 0),
+          String(centsToDollars(scan.amount ?? 0).toFixed(2)),
           escapeCsv(String(scan.irs_category || scan.category || '')),
           scan.is_deductible ? '100' : '0',
           scan.is_deductible ? 'Yes' : 'No',

@@ -8,6 +8,7 @@ import { AppFooter } from '@/components/AppFooter';
 import { useScansRealtime } from '@/hooks/useScansRealtime';
 import { Camera, Loader2 } from 'lucide-react';
 import { getCategoryEmoji } from '@/lib/constants';
+import { formatCents } from '@/lib/format';
 
 interface LineItem {
   description: string;
@@ -241,11 +242,11 @@ function DashboardContent() {
           </div>
           <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Total deductions</p>
-            <p className="mt-1 text-2xl font-semibold text-[#4F46E5]">${totalDeductions.toFixed(2)}</p>
+            <p className="mt-1 text-2xl font-semibold text-[#4F46E5]">{formatCents(totalDeductions)}</p>
           </div>
           <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Est. tax saved</p>
-            <p className="mt-1 text-2xl font-semibold text-white">${estimatedSaved.toFixed(2)}</p>
+            <p className="mt-1 text-2xl font-semibold text-white">{formatCents(estimatedSaved)}</p>
           </div>
           <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Biggest category</p>
@@ -294,7 +295,7 @@ function DashboardContent() {
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <span className="text-sm font-medium text-[#4F46E5]">${amt.toFixed(2)}</span>
+                    <span className="text-sm font-medium text-[#4F46E5]">{formatCents(amt)}</span>
                   </div>
                 );
               })}

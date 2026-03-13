@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { LineItemCard } from './LineItemCard';
+import { formatCents } from '@/lib/format';
 
 interface LineItem {
   description: string;
@@ -84,7 +85,7 @@ export function ReceiptDetailModal({ scan, onClose }: ReceiptDetailModalProps) {
           )}
           <div className="flex justify-between text-sm text-zinc-500">
             <span>{date || 'No date'}</span>
-            <span>Total: ${total.toFixed(2)}</span>
+            <span>Total: {formatCents(total)}</span>
           </div>
           <div className="mt-4 space-y-4">
             {lineItems.map((item, idx) => (

@@ -1,6 +1,7 @@
 'use client';
 
 import { LineItemCard } from './LineItemCard';
+import { formatCents } from '@/lib/format';
 
 export interface LineItem {
   description: string;
@@ -31,7 +32,7 @@ export function ScanResults({ result, saved }: ScanResultsProps) {
     <div className="mt-12 space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">{result.merchant_name}</h2>
-        <p className="text-sm text-zinc-500">Total: ${result.total_amount.toFixed(2)}</p>
+        <p className="text-sm text-zinc-500">Total: {formatCents(result.total_amount)}</p>
       </div>
 
       <div className="space-y-4">
