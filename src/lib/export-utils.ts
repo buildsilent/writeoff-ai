@@ -137,3 +137,46 @@ export function getCategoryTotals(rows: ExportLineItem[]): Map<string, number> {
 export function formatCentsForExport(cents: number): string {
   return (cents / 100).toFixed(2);
 }
+
+// Schedule C Part II line mapping (IRS Form 1040 Schedule C)
+const SCHEDULE_C_LINES: Record<string, { line: number; label: string }> = {
+  'Advertising & Marketing': { line: 8, label: 'Advertising' },
+  'Advertising and Marketing': { line: 8, label: 'Advertising' },
+  'Vehicle & Mileage': { line: 9, label: 'Car and truck expenses' },
+  'Vehicle and Mileage': { line: 9, label: 'Car and truck expenses' },
+  'Professional Services': { line: 15, label: 'Legal and professional services' },
+  'Office Supplies': { line: 16, label: 'Office expense' },
+  'Software & Subscriptions': { line: 16, label: 'Office expense' },
+  'Retirement Contributions': { line: 17, label: 'Pension and profit-sharing plans' },
+  'Equipment': { line: 12, label: 'Depreciation and section 179 expense deduction' },
+  'Repairs and Maintenance': { line: 20, label: 'Repairs and maintenance' },
+  'Supplies': { line: 21, label: 'Supplies' },
+  'Travel': { line: 23, label: 'Travel' },
+  'Meals & Entertainment': { line: 24, label: 'Meals and entertainment' },
+  'Meals and Entertainment': { line: 24, label: 'Meals and entertainment' },
+  'Phone & Internet': { line: 25, label: 'Utilities' },
+  'Phone and Internet': { line: 25, label: 'Utilities' },
+  'Home Office': { line: 30, label: 'Other (home office)' },
+  'Health Insurance': { line: 29, label: 'Health insurance' },
+  'Education': { line: 27, label: 'Other (education)' },
+  'Startup Costs': { line: 27, label: 'Other (startup costs)' },
+  'Gifts to Clients': { line: 27, label: 'Other (gifts)' },
+};
+
+export function categoryTotalsToScheduleCLines(categoryTotals: Map<string, number>): Array<{ line: number; label: string; amount: number }> {
+  const byLine = new Map<number, { label: string; amount: number }>();
+  for (const [cat, amount] of categoryTotals) {
+    const mapping = SCHEDULE_C_LINES[cat];
+    const lineNum = mapping?.line ?? 27;
+    const label = mapping?.label ?? 'Other expenses';
+    const existing = byLine.get(lineNum);
+    if (existing) {
+      existing.amount += amount;
+    } else {
+      byLine.set(lineNum, { label, amount });
+    }
+  }
+  return Array.from(byLine.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([line, { label, amount }]) => ({ line, label, amount }));
+}

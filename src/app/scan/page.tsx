@@ -8,6 +8,7 @@ import { AppFooter } from '@/components/AppFooter';
 import { ScanResults } from '@/components/ScanResults';
 import { ScanCelebrationModal, getDeductionStatsFromResult } from '@/components/ScanCelebrationModal';
 import { LineItemCard } from '@/components/LineItemCard';
+import { ReceiptRequirementsReminder } from '@/components/ReceiptRequirementsReminder';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { Camera, FileText, Loader2, RotateCcw, CheckCircle2, Receipt, LayoutDashboard } from 'lucide-react';
 import { notifyScanComplete } from '@/hooks/useScansRealtime';
@@ -493,6 +494,15 @@ function ScanContent() {
               }}
               saved={saved}
             />
+
+            <div className="mt-6">
+              <ReceiptRequirementsReminder
+                merchantName={result.merchant_name || ''}
+                date={result.date || null}
+                amount={Math.round((result.total_amount ?? 0) * 100)}
+                hasDeductibleItems={(result.line_items as Array<{ is_deductible?: boolean }>).some((li) => li.is_deductible)}
+              />
+            </div>
 
             {/* Post-scan prompts card */}
             <div className="mt-8 rounded-[12px] border border-emerald-500/30 bg-emerald-500/10 p-6">

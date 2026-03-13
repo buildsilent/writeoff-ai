@@ -10,6 +10,14 @@ import { Camera, Loader2, Download } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
 import { getCategoryEmoji } from '@/lib/constants';
 import { formatCents } from '@/lib/format';
+import {
+  computeTaxHealthScore,
+  computeYearOverYear,
+  computeTaxSavingProjection,
+  computeQuarterlyTax,
+  getDeductionCalendarInsight,
+  type ScanForInsights,
+} from '@/lib/tax-insights';
 import { EmailDigestBanner } from '@/components/EmailDigestBanner';
 import { ExportModal } from '@/components/ExportModal';
 
@@ -100,6 +108,13 @@ function DashboardContent() {
   }, [upgradedParam, usage]);
 
   const thisYear = new Date().getFullYear();
+  const scansForInsights = scans as ScanForInsights[];
+  const taxHealth = useMemo(() => computeTaxHealthScore(scansForInsights), [scansForInsights]);
+  const yearOverYear = useMemo(() => computeYearOverYear(scansForInsights), [scansForInsights]);
+  const taxProjection = useMemo(() => computeTaxSavingProjection(scansForInsights), [scansForInsights]);
+  const quarterlyTax = useMemo(() => computeQuarterlyTax(scansForInsights), [scansForInsights]);
+  const calendarInsight = useMemo(() => getDeductionCalendarInsight(scansForInsights, thisYear), [scansForInsights, thisYear]);
+
   const { totalScans, totalDeductions, estimatedSaved, biggestCategory, monthlyData, categoryData, streakWeeks } = useMemo(() => {
     const yearScans = scans.filter((s) => {
       const d = (s.date || s.created_at?.slice(0, 10)) ? new Date(s.date || s.created_at!) : new Date();
@@ -251,6 +266,54 @@ function DashboardContent() {
           </button>
         </div>
 
+        {/* Tax health score */}
+        <div className="mt-8 rounded-[12px] border border-[#4F46E5]/20 bg-[#4F46E5]/5 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-white">Tax health score</p>
+              <p className="text-xs text-zinc-500">Based on consistency, categories, and gaps</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-3xl font-bold ${
+                  taxHealth.score >= 70 ? 'text-emerald-400' : taxHealth.score >= 40 ? 'text-amber-400' : 'text-zinc-400'
+                }`}
+              >
+                {taxHealth.score}
+              </span>
+              <span className="text-zinc-500">/100</span>
+            </div>
+          </div>
+          {taxHealth.recommendations.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {taxHealth.recommendations.slice(0, 2).map((rec, i) => (
+                <p key={i} className="text-sm text-amber-200/90">
+                  → {rec}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tax projection + quarterly */}
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Tax saving projection</p>
+            <p className="mt-2 text-sm text-white">{taxProjection.message}</p>
+          </div>
+          <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Estimated quarterly tax</p>
+            <p className="mt-2 text-sm text-white">{quarterlyTax.message}</p>
+          </div>
+        </div>
+
+        {/* Year over year */}
+        {yearOverYear.message && (
+          <div className="mt-4 rounded-[12px] border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+            <p className="text-sm text-emerald-200">{yearOverYear.message}</p>
+          </div>
+        )}
+
         {/* Annual summary */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
@@ -309,20 +372,25 @@ function DashboardContent() {
           <p className="mt-1 text-xs text-zinc-500">Weeks in a row you&apos;ve scanned receipts</p>
         </div>
 
-        {/* Monthly bar chart */}
+        {/* Deduction calendar */}
         <div className="mt-8 rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
-          <p className="text-sm font-medium text-white">Deductions by month ({thisYear})</p>
+          <p className="text-sm font-medium text-white">Deduction calendar ({thisYear})</p>
           <div className="mt-4 flex items-end justify-between gap-2">
             {MONTH_LABELS.map((label, i) => (
               <div key={label} className="flex flex-1 flex-col items-center gap-1">
                 <div
-                  className="w-full min-h-[4px] rounded-t bg-[#4F46E5] transition-all"
+                  className={`w-full min-h-[4px] rounded-t transition-all ${
+                    calendarInsight.slowMonths.includes(i) ? 'bg-amber-500/60' : 'bg-[#4F46E5]'
+                  }`}
                   style={{ height: `${Math.max(4, (monthlyData[i] / maxMonth) * 80)}px` }}
                 />
                 <span className="text-[10px] text-zinc-500">{label}</span>
               </div>
             ))}
           </div>
+          {calendarInsight.suggestion && (
+            <p className="mt-4 text-sm text-amber-200/90">{calendarInsight.suggestion}</p>
+          )}
         </div>
 
         {/* Category breakdown */}

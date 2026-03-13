@@ -19,6 +19,7 @@ import {
   scansToExportRows,
   getCategoryTotals,
   formatCentsForExport,
+  categoryTotalsToScheduleCLines,
   type ExportScan,
 } from '@/lib/export-utils';
 
@@ -30,8 +31,11 @@ interface ExportModalProps {
   onClose: () => void;
 }
 
+import { FileCheck } from 'lucide-react';
+
 const EXPORT_OPTIONS = [
   { id: 'pdf', icon: FileText, label: 'PDF', desc: 'Professional tax summary with categories and totals' },
+  { id: 'cpa', icon: FileCheck, label: 'CPA-ready Schedule C', desc: 'Schedule C worksheet format for your accountant' },
   { id: 'excel', icon: FileSpreadsheet, label: 'Excel/XLSX', desc: 'Formatted spreadsheet for editing' },
   { id: 'csv', icon: FileDown, label: 'CSV', desc: 'Simple comma-separated file' },
   { id: 'sheets', icon: Sheet, label: 'Google Sheets', desc: 'Download CSV and import to a new Sheet' },
@@ -102,6 +106,46 @@ export function ExportModal({ scans, userName, onClose }: ExportModalProps) {
     return doc.output('blob');
   };
 
+  const generateScheduleCPdf = (): Blob => {
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Schedule C Worksheet — Business Expenses', 14, 18);
+    doc.setFontSize(10);
+    doc.text(`Prepared by TaxSnapper for: ${userName || 'Taxpayer'}`, 14, 26);
+    doc.text(`Tax year: ${new Date().getFullYear()}`, 14, 32);
+    doc.text(`Date range: ${dateRange === 'all_time' ? 'All Time' : dateRange === 'this_year' ? 'This Year' : dateRange === 'this_month' ? 'This Month' : `${customStart} to ${customEnd}`}`, 14, 38);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 44);
+
+    const scheduleCLines = categoryTotalsToScheduleCLines(categoryTotals);
+    const tableBody = scheduleCLines.map(({ line, label, amount }) => [
+      String(line),
+      label,
+      `$${formatCentsForExport(amount)}`,
+    ]);
+    if (tableBody.length === 0) {
+      tableBody.push(['—', 'No expenses in selected range', '$0.00']);
+    }
+
+    autoTable(doc, {
+      startY: 52,
+      head: [['Line', 'Description (Schedule C Part II)', 'Amount ($)']],
+      body: tableBody,
+      theme: 'plain',
+      headStyles: { fillColor: [60, 60, 60], textColor: 255 },
+      margin: { left: 14 },
+    });
+
+    const finalY = (doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 58;
+    doc.setFontSize(10);
+    doc.text(`TOTAL DEDUCTIONS: $${formatCentsForExport(grandTotalCents)}`, 14, finalY + 12);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(DISCLAIMER, 14, doc.internal.pageSize.height - 10, { maxWidth: 180 });
+    doc.text('Hand this worksheet to your CPA. Line numbers correspond to IRS Form 1040 Schedule C.', 14, doc.internal.pageSize.height - 6, { maxWidth: 180 });
+    return doc.output('blob');
+  };
+
   const generateCsv = (): string => {
     const headers = ['Date', 'Merchant', 'Amount', 'Deductible Amount', 'IRS Category', 'Deduction %', 'Confidence', 'Notes'];
     const csvRows = [
@@ -167,6 +211,10 @@ export function ExportModal({ scans, userName, onClose }: ExportModalProps) {
         const blob = generatePdf();
         downloadBlob(blob, `taxsnapper-summary-${suffix}.pdf`);
         setSuccess('PDF downloaded');
+      } else if (type === 'cpa') {
+        const blob = generateScheduleCPdf();
+        downloadBlob(blob, `taxsnapper-schedule-c-worksheet-${suffix}.pdf`);
+        setSuccess('CPA-ready Schedule C worksheet downloaded');
       } else if (type === 'excel') {
         const blob = generateExcel();
         downloadBlob(blob, `taxsnapper-receipts-${suffix}.xlsx`);

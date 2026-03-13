@@ -12,6 +12,7 @@ interface LineItem {
   is_deductible: boolean;
   confidence: number;
   explanation: string;
+  audit_risk_score?: number;
 }
 
 interface Scan {

@@ -15,7 +15,22 @@ export const IRS_CATEGORY_EMOJI: Record<string, string> = {
   'Phone & Internet': '📱',
   'Phone and Internet': '📱',
   'Health Insurance': '🏥',
+  'Education': '📚',
+  'Retirement Contributions': '🏦',
+  'Startup Costs': '🚀',
+  'Gifts to Clients': '🎁',
+  'Equipment': '🖥️',
+  'Not Deductible': '❌',
 };
+
+// IRS receipt documentation requirements (Publication 535)
+export const IRS_RECEIPT_REQUIREMENTS = [
+  { id: 'amount', label: 'Amount', description: 'Total paid' },
+  { id: 'date', label: 'Date', description: 'Date of purchase' },
+  { id: 'place', label: 'Place', description: 'Name and address of vendor' },
+  { id: 'business_purpose', label: 'Business purpose', description: 'Why it was necessary for your business' },
+  { id: 'business_relationship', label: 'Business relationship', description: 'For meals: who you met and their role' },
+] as const;
 
 export function getCategoryEmoji(irsCategory: string | null): string {
   if (!irsCategory) return '';

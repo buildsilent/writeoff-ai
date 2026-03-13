@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
         if (!email) continue;
 
         await getResend().emails.send({
-          from: process.env.RESEND_FROM_EMAIL || 'TaxSnapper <onboarding@resend.dev>',
+          from: process.env.RESEND_FROM_EMAIL || 'TaxSnapper <hello@taxsnapper.com>',
           to: email,
           subject: `Your weekly tax tip from TaxSnapper`,
           html: `
