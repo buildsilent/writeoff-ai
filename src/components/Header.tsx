@@ -70,7 +70,7 @@ export function Header() {
               href="/scan"
               className="btn-primary hidden cursor-pointer rounded-[12px] bg-[#4F46E5] px-4 py-2.5 text-sm font-medium text-white shadow-[0_2px_12px_rgba(79,70,229,0.4)] transition-all hover:shadow-[0_4px_20px_rgba(79,70,229,0.5)] sm:inline-block"
             >
-              Start Free
+              Scan Now
             </Link>
             <UserButton />
           </Show>

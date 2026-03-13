@@ -6,10 +6,10 @@ export async function GET() {
   try {
     const { userId } = await auth();
     if (!userId) {
+      console.log('[scans API] No userId from auth — Unauthorized');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only return scans for the authenticated user (filtered by Clerk user ID)
     const { data, error } = await getSupabaseAdmin()
       .from('scans')
       .select('*')
@@ -17,11 +17,14 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Scans fetch error:', error);
+      console.error('[scans API] Supabase error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data || []);
+    const rows = data || [];
+    console.log(`[scans API] userId=${userId} rows=${rows.length} ids=${rows.slice(0, 3).map((r) => r?.id).join(',')}`);
+
+    return NextResponse.json(rows);
   } catch (err) {
     console.error('Scans error:', err);
     return NextResponse.json({ error: 'Failed to fetch scans' }, { status: 500 });

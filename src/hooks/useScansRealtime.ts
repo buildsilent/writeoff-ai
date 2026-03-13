@@ -8,7 +8,7 @@ export const SCAN_COMPLETE_EVENT = 'taxsnapper:scan-complete';
 export const SCANS_REFRESH_CHANNEL = 'taxsnapper-scans-refresh';
 
 export function useScansRealtime() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const userId = user?.id ?? null;
   const [scans, setScans] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +16,7 @@ export function useScansRealtime() {
 
   const refetch = useCallback(async () => {
     try {
-      const res = await fetch('/api/scans');
+      const res = await fetch('/api/scans', { credentials: 'include' });
       if (res.status === 401) {
         setScans([]);
         setError(true);
@@ -24,9 +24,14 @@ export function useScansRealtime() {
         return;
       }
       const data = await res.json();
-      setScans(Array.isArray(data) ? data : []);
+      const arr = Array.isArray(data) ? data : [];
+      setScans(arr);
       setError(false);
-    } catch {
+      if (typeof window !== 'undefined') {
+        console.log('[useScansRealtime] fetched', arr.length, 'scans', arr.slice(0, 2));
+      }
+    } catch (err) {
+      if (typeof window !== 'undefined') console.error('[useScansRealtime] fetch error', err);
       setError(true);
     } finally {
       setLoading(false);
@@ -34,6 +39,7 @@ export function useScansRealtime() {
   }, []);
 
   useEffect(() => {
+    if (!isLoaded) return;
     let mounted = true;
     refetch();
 
@@ -66,7 +72,7 @@ export function useScansRealtime() {
       clearInterval(pollInterval);
       bc?.close();
     };
-  }, [refetch]);
+  }, [isLoaded, refetch]);
 
   useEffect(() => {
     if (!supabase || !userId) return;
