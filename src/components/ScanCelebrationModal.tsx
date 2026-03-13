@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import confetti from 'canvas-confetti';
-import { CheckCircle2, Receipt, Share2 } from 'lucide-react';
+import { BarChart3, CheckCircle2, Loader2, Receipt, Share2 } from 'lucide-react';
 import { formatCents } from '@/lib/format';
-import { getDeductionStatsFromLineItems } from '@/lib/deductions';
+import { getDeductionStatsFromLineItems, type LineItemInput } from '@/lib/deductions';
 
 interface LineItem {
   amount: number;
@@ -14,18 +14,56 @@ interface LineItem {
 }
 
 interface ScanCelebrationModalProps {
-  deductionCount: number;
-  estimatedSavingsCents: number;
+  scanId: string;
+  /** Fallback if fetch fails — never used for display when fetch succeeds */
+  fallbackDeductionCount?: number;
+  fallbackSavingsCents?: number;
   onScanAnother: () => void;
   onClose: () => void;
 }
 
 export function ScanCelebrationModal({
-  deductionCount,
-  estimatedSavingsCents,
+  scanId,
+  fallbackDeductionCount = 0,
+  fallbackSavingsCents = 0,
   onScanAnother,
   onClose,
 }: ScanCelebrationModalProps) {
+  const [stats, setStats] = useState<{ count: number; savingsCents: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/scans/${scanId}`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const s = getDeductionStatsFromLineItems(data.line_items ?? [], true);
+        if (!cancelled) setStats({ count: s.count, savingsCents: s.taxSavingsCents });
+
+        if (process.env.NODE_ENV === 'development') {
+          const listRes = await fetch('/api/scans');
+          if (listRes.ok) {
+            const list = await listRes.json();
+            const match = list.find((r: { id: string }) => r.id === scanId);
+            if (match) {
+              const lineItems = (match.raw_data as { line_items?: LineItemInput[] })?.line_items ?? [];
+              const listStats = getDeductionStatsFromLineItems(lineItems, true);
+              if (s.taxSavingsCents !== listStats.taxSavingsCents) {
+                console.error('[ScanCelebration] Amount mismatch: popup', s.taxSavingsCents, 'vs dashboard', listStats.taxSavingsCents);
+              }
+            }
+          }
+        }
+      } catch {
+        if (!cancelled) setStats({ count: fallbackDeductionCount, savingsCents: fallbackSavingsCents });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [scanId, fallbackDeductionCount, fallbackSavingsCents]);
+
+  const deductionCount = stats?.count ?? fallbackDeductionCount;
+  const estimatedSavingsCents = stats?.savingsCents ?? fallbackSavingsCents;
   useEffect(() => {
     const duration = 2000;
     const end = Date.now() + duration;
@@ -70,6 +108,11 @@ export function ScanCelebrationModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="relative w-full max-w-md rounded-[16px] border border-emerald-500/30 bg-[#0f1729] p-6 shadow-2xl">
+        {stats === null && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-[16px] bg-[#0f1729]/90">
+            <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+          </div>
+        )}
         <div className="flex items-center gap-2 text-emerald-400">
           <CheckCircle2 className="h-6 w-6 shrink-0" />
           <h2 className="text-xl font-semibold">Receipt saved!</h2>
@@ -96,7 +139,15 @@ export function ScanCelebrationModal({
             className="flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-white/[0.12] bg-white/[0.04] py-3 font-medium text-white transition-all hover:bg-white/[0.08]"
           >
             <Receipt className="h-5 w-5" />
-            View all my receipts
+            View My Receipts
+          </Link>
+          <Link
+            href="/dashboard"
+            onClick={onClose}
+            className="flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-white/[0.12] bg-white/[0.04] py-3 font-medium text-white transition-all hover:bg-white/[0.08]"
+          >
+            <BarChart3 className="h-5 w-5" />
+            View Dashboard
           </Link>
           <button
             type="button"

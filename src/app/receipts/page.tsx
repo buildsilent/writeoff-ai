@@ -55,6 +55,7 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+const UNDATED_YEAR = -1;
 
 type DateRangeFilter = 'today' | 'this_week' | 'this_month' | 'this_year' | 'all_time';
 type AmountSort = 'low_to_high' | 'high_to_low';
@@ -81,12 +82,24 @@ function isPhotoScan(scan: Scan): boolean {
   return Boolean(scan.receipt_image_url);
 }
 
+/** Parse receipt date (YYYY-MM-DD). Returns null if invalid or year < 2020. */
+function parseReceiptDate(scan: Scan): { year: number; month: number } | null {
+  const dateStr = scan.date || scan.raw_data?.date;
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const year = parseInt(match[1], 10);
+  const month = Math.max(0, Math.min(11, parseInt(match[2], 10) - 1));
+  if (Number.isNaN(year) || year < 2020) return null;
+  return { year, month };
+}
+
 function buildCabinet(scans: Scan[]): Map<number, Map<number, Map<string, Scan[]>>> {
   const byYear = new Map<number, Map<number, Map<string, Scan[]>>>();
   for (const s of scans) {
-    const d = (s.date || s.created_at?.slice(0, 10)) ? new Date(s.date || s.created_at!) : new Date();
-    const year = d.getFullYear();
-    const month = d.getMonth();
+    const parsed = parseReceiptDate(s);
+    const year = parsed ? parsed.year : UNDATED_YEAR;
+    const month = parsed ? parsed.month : 0;
     const cat = getPrimaryCategory(s);
     if (!byYear.has(year)) byYear.set(year, new Map());
     const byMonth = byYear.get(year)!;
@@ -293,7 +306,7 @@ function ReceiptsContent() {
 
   const cabinet = useMemo(() => buildCabinet(filteredScans), [filteredScans]);
   const grandTotal = useMemo(() => scans.reduce((sum, s) => sum + getDeductionAmountCents(s), 0), [scans]);
-  const years = Array.from(cabinet.keys()).sort((a, b) => b - a);
+  const years = Array.from(cabinet.keys()).sort((a, b) => (a === UNDATED_YEAR ? 1 : b === UNDATED_YEAR ? -1 : b - a));
   const hasReceipts = scans.length > 0;
 
   const categoryOptions = useMemo(() => {
@@ -478,7 +491,7 @@ function ReceiptsContent() {
               return (
                 <CollapsibleFolder
                   key={year}
-                  label={String(year)}
+                  label={year === UNDATED_YEAR ? 'Undated' : String(year)}
                   total={yearDed}
                   isOpen={isYearOpen}
                   onToggle={() => setExpandedYears((s) => {
@@ -505,7 +518,7 @@ function ReceiptsContent() {
                       return (
                         <CollapsibleFolder
                           key={monthKey}
-                          label={MONTH_NAMES[month]}
+                          label={year === UNDATED_YEAR ? 'No date' : MONTH_NAMES[month]}
                           total={monthDed}
                           isOpen={isMonthOpen}
                           onToggle={() => setExpandedMonths((s) => {

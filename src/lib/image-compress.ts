@@ -1,9 +1,46 @@
 /**
- * Compress image before upload. Resize to max 1920px, JPEG quality 0.82.
- * Reduces payload size for faster upload and lower OpenAI costs.
+ * Compress and enhance receipt images before upload.
+ * - Resize to max 1920px, JPEG quality 0.82
+ * - Increase contrast for better OCR
+ * - Sharpen edges for receipt text
+ * - Optional grayscale (receipts often read better without color noise)
  */
 const MAX_DIM = 1920;
 const JPEG_QUALITY = 0.82;
+
+/** Apply contrast + sharpen via canvas. Improves receipt readability for AI. */
+function enhanceReceiptImage(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const d = imageData.data;
+  const contrast = 1.2;
+  const offset = 128 * (1 - contrast);
+
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = Math.min(255, Math.max(0, d[i] * contrast + offset));
+    d[i + 1] = Math.min(255, Math.max(0, d[i + 1] * contrast + offset));
+    d[i + 2] = Math.min(255, Math.max(0, d[i + 2] * contrast + offset));
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  // Light sharpen (3x3: center 9, neighbors -1). Edges stay as-is.
+  const kernel = [-1, -1, -1, -1, 9, -1, -1, -1, -1];
+  const out = new Uint8ClampedArray(d);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      for (let c = 0; c < 4; c++) {
+        let sum = 0;
+        for (let ky = -1; ky <= 1; ky++) {
+          for (let kx = -1; kx <= 1; kx++) {
+            sum += d[((y + ky) * w + (x + kx)) * 4 + c] * kernel[(ky + 1) * 3 + (kx + 1)];
+          }
+        }
+        out[(y * w + x) * 4 + c] = Math.min(255, Math.max(0, sum));
+      }
+    }
+  }
+  for (let i = 0; i < d.length; i++) d[i] = out[i];
+  ctx.putImageData(imageData, 0, 0);
+}
 
 export async function compressImageForUpload(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -35,6 +72,7 @@ export async function compressImageForUpload(file: File): Promise<string> {
         return;
       }
       ctx.drawImage(img, 0, 0, dw, dh);
+      enhanceReceiptImage(ctx, dw, dh);
 
       const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
       const quality = mime === 'image/jpeg' ? JPEG_QUALITY : 0.9;

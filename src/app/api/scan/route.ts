@@ -79,13 +79,27 @@ export async function POST(req: NextRequest) {
     let result: Awaited<ReturnType<typeof analyzeReceiptImage>>;
     let receiptImageUrl: string | null = null;
 
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const todayYMD = now.toISOString().slice(0, 10);
+    const clientDateStr =
+      typeof clientLocalDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(clientLocalDate)
+        ? clientLocalDate
+        : todayYMD;
+
     if (type === 'image') {
       if (!imageBase64) {
         return NextResponse.json({ error: 'imageBase64 required for image scan' }, { status: 400 });
       }
-      result = await analyzeReceiptImage(imageBase64, hint, RECEIPT_MODEL_MINI);
+      result = await analyzeReceiptImage(imageBase64, hint, RECEIPT_MODEL_MINI, {
+        currentYear,
+        todayYMD,
+      });
       if ((result.line_items?.length ?? 0) > 10) {
-        result = await analyzeReceiptImage(imageBase64, hint, RECEIPT_MODEL_FULL);
+        result = await analyzeReceiptImage(imageBase64, hint, RECEIPT_MODEL_FULL, {
+          currentYear,
+          todayYMD,
+        });
       }
       receiptImageUrl = await uploadReceiptImage(supabase, userId, imageBase64);
     } else {
@@ -117,21 +131,37 @@ export async function POST(req: NextRequest) {
 
     const lineItems = result.line_items ?? [];
     const firstItem = lineItems[0];
-    // Use receipt's printed date if found; otherwise user's local date (clientLocalDate) to avoid UTC off-by-one for US users
-    const dateStr = result.date && /^\d{4}-\d{2}-\d{2}/.test(String(result.date))
+    // Use receipt's printed date if found; validate year >= 2020
+    let dateStr = result.date && /^\d{4}-\d{2}-\d{2}/.test(String(result.date))
       ? String(result.date).slice(0, 10)
-      : (typeof clientLocalDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(clientLocalDate)
-          ? clientLocalDate
-          : new Date().toISOString().slice(0, 10));
-    // Store amounts in cents (OpenAI returns dollars) for consistency across DB and UI
-    const amountCents = Math.round((result.total_amount ?? 0) * 100);
+      : clientDateStr;
+    const dateYear = parseInt(dateStr.slice(0, 4), 10);
+    if (Number.isNaN(dateYear) || dateYear < 2020) dateStr = clientDateStr;
+
+    // Amounts from normalizeAnalysis are already in cents
+    const totalFromAI = Math.round(Number(result.total_amount ?? 0));
+    const sumFromLineItems = Math.round(lineItems.reduce((s, li) => s + Number(li.amount ?? 0), 0));
+    const amountCents = totalFromAI > 0 ? totalFromAI : sumFromLineItems;
+
+    // Server-side: recalc deductible_amount_cents for each line item (never trust AI math)
+    const lineItemsWithRecalc = lineItems.map((li) => {
+      const amtCents = Math.round(Number(li.amount ?? 0));
+      const pct = Number(li.deduction_percent ?? 0);
+      const safePct = pct >= 75 ? 100 : pct >= 25 ? 50 : 0;
+      const deductibleCents = Math.round(amtCents * safePct / 100);
+      return {
+        ...li,
+        amount: amtCents,
+        deduction_percent: safePct,
+        deductible_amount_cents: deductibleCents,
+      };
+    });
+
     const rawDataNormalized = {
       ...result,
       total_amount: amountCents,
-      line_items: lineItems.map((li) => ({
-        ...li,
-        amount: Math.round((li.amount ?? 0) * 100),
-      })),
+      date: dateStr,
+      line_items: lineItemsWithRecalc,
     };
     // Ensure raw_data is valid JSON (PostgREST/JSONB requires serializable data)
     let rawDataSafe: Record<string, unknown>;
@@ -149,7 +179,7 @@ export async function POST(req: NextRequest) {
     const scanRow = {
       user_id: userId,
       merchant_name: result.merchant_name ?? null,
-      amount: amountCents,
+      amount: amountCents || sumFromLineItems || 0,
       date: dateStr,
       category: (firstItem?.irs_category as string | null) ?? null,
       is_deductible: lineItems.some((li) => li.is_deductible),
@@ -245,7 +275,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('Scan error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Scan failed' },
+      { error: 'Scan failed', message: 'Something went wrong. Please try again.' },
       { status: 500 }
     );
   }

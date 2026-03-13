@@ -8,14 +8,14 @@ function getOpenAI() {
 
 export interface LineItemAnalysis {
   description: string;
-  amount: number;
+  amount: number;        // always in cents
   irs_category: string;
-  deduction_percent: number;
+  deduction_percent: number;  // only 100, 50, or 0
   is_deductible: boolean;
   confidence: number;
   explanation: string;
   needs_more_context?: boolean;
-  audit_risk_score?: number; // 0-100, higher = IRS scrutinizes more; common triggers: home office >50%, meals >$10k/yr, vehicle 100% business
+  audit_risk_score?: number;
 }
 
 export interface ReceiptAnalysis {
@@ -61,11 +61,13 @@ Store answers mentally for future accuracy. Ask only when necessary.
 
 OUTPUT RULES:
 - Assign EXACT IRS Schedule C category from the list below.
-- State EXACT deduction_percent: 100, 50, or 0 (or actual business-use % for phone/internet).
+- deduction_percent: ONLY 100, 50, or 0. Never invent a percentage. Meals=50%, business purchases=100%, personal=0%. For mixed-use ask user for percentage.
+- If unsure about deductibility return is_deductible: false. Do NOT guess.
 - Explain in plain English with IRS code when relevant.
 - Confidence 0.0–1.0 based on receipt clarity and applicable rules.
+- Return ALL amounts as integers in CENTS (e.g. $12.99 = 1299). No decimals, no strings.
 - needs_more_context: true ONLY when one smart question would resolve deductibility.
-- Never miss a deduction. When uncertain, err toward potentially deductible with lower confidence.
+- Never miss a deduction. When uncertain about business use, set is_deductible: false rather than guessing.
 
 IRS Schedule C categories (use exactly these names):
 Office Supplies, Meals & Entertainment, Travel, Vehicle & Mileage, Software & Subscriptions, Advertising & Marketing, Professional Services, Phone & Internet, Home Office, Health Insurance, Equipment, Education, Retirement Contributions, Startup Costs, Gifts to Clients, Not Deductible
@@ -73,27 +75,49 @@ Office Supplies, Meals & Entertainment, Travel, Vehicle & Mileage, Software & Su
 Return ONLY valid JSON (no markdown):`;
 
 const IMAGE_PROMPT = `${CPA_SYSTEM}
+
+DATE EXTRACTION — CRITICAL:
+- Extract the exact date printed on the receipt. Return as YYYY-MM-DD.
+- The current year is {CURRENT_YEAR}. Never return a date before 2020.
+- If receipt shows only month and day with no year, use {CURRENT_YEAR} as the year.
+- If no date found use today: {TODAY_YYYY_MM_DD}.
+- Never guess or invent a date. Validate: year must be >= 2020.
+
+This is a receipt image. Focus only on the receipt itself, ignore background. Extract: merchant name, date, every line item with its price, subtotal, tax, and total.
+If the image is blurry, unreadable, or you cannot extract data return: {"read_successfully": false, "error": "UNREADABLE_IMAGE"}
+
 {
   "read_successfully": true or false,
+  "error": "UNREADABLE_IMAGE" (only when image unreadable),
   "merchant_name": "string",
-  "date": "YYYY-MM-DD or null",
-  "total_amount": number,
+  "date": "YYYY-MM-DD",
+  "total_amount": integer (CENTS),
   "line_items": [
     {
       "description": "exact item from receipt",
-      "amount": number,
+      "amount": integer (CENTS),
       "irs_category": "IRS category name",
-      "deduction_percent": 100 or 50 or 0 or business-use %,
+      "deduction_percent": 100 or 50 or 0,
       "is_deductible": true or false,
       "confidence": 0.0 to 1.0,
-      "explanation": "Plain English explanation with IRS reference when relevant",
+      "explanation": "Plain English with IRS reference",
       "needs_more_context": true or false,
       "audit_risk_score": 0 to 100
     }
   ]
 }
 
-Set "read_successfully": false ONLY when the image is blurry, too dark, rotated, or otherwise unreadable.`;
+Amounts MUST be integers in cents. deduction_percent ONLY 100, 50, or 0.`;
+
+function buildImagePrompt(context: { currentYear: number; todayYMD: string; hint?: string }): string {
+  let p = IMAGE_PROMPT
+    .replace(/{CURRENT_YEAR}/g, String(context.currentYear))
+    .replace(/{TODAY_YYYY_MM_DD}/g, context.todayYMD);
+  if (context.hint && context.hint !== 'not_sure') {
+    p += `\n\nADDITIONAL CONTEXT (user indicated purchase type): "${context.hint}"`;
+  }
+  return p;
+}
 
 function withCategoryHint(prompt: string, hint?: string): string {
   if (!hint || hint === 'not_sure') return prompt;
@@ -102,15 +126,16 @@ function withCategoryHint(prompt: string, hint?: string): string {
 
 const TEXT_PROMPT = `${CPA_SYSTEM}
 If you need ONE critical piece of information to determine deductibility, include "follow_up_question" and minimal line_items. Otherwise return full analysis.
+Return ALL amounts as integers in CENTS. deduction_percent ONLY 100, 50, or 0.
 {
   "follow_up_question": "optional - ONE smart question only if critical info missing",
   "merchant_name": "string",
   "date": "YYYY-MM-DD or null",
-  "total_amount": number,
+  "total_amount": integer (CENTS),
   "line_items": [
     {
       "description": "item description",
-      "amount": number,
+      "amount": integer (CENTS),
       "irs_category": "IRS category name",
       "deduction_percent": 100 or 50 or 0,
       "is_deductible": true or false,
@@ -132,9 +157,19 @@ Using both, generate the complete receipt analysis. Return the same JSON format.
 export const RECEIPT_MODEL_MINI = 'gpt-4o-mini';
 export const RECEIPT_MODEL_FULL = 'gpt-4o';
 
-export async function analyzeReceiptImage(base64Image: string, hint?: string, model: string = RECEIPT_MODEL_MINI): Promise<ReceiptAnalysis> {
+export async function analyzeReceiptImage(
+  base64Image: string,
+  hint?: string,
+  model: string = RECEIPT_MODEL_MINI,
+  context?: { currentYear: number; todayYMD: string }
+): Promise<ReceiptAnalysis> {
   const openai = getOpenAI();
-  const prompt = withCategoryHint(IMAGE_PROMPT, hint);
+  const now = new Date();
+  const ctx = context ?? {
+    currentYear: now.getFullYear(),
+    todayYMD: now.toISOString().slice(0, 10),
+  };
+  const prompt = buildImagePrompt({ ...ctx, hint });
   const response = await openai.chat.completions.create({
     model,
     max_tokens: 2000,
@@ -162,6 +197,9 @@ export async function analyzeReceiptImage(base64Image: string, hint?: string, mo
   const content = response.choices[0]?.message?.content || '{}';
   const cleaned = content.replace(/```json\n?|\n?```/g, '').trim();
   const parsed = JSON.parse(cleaned);
+  if (parsed.error === 'UNREADABLE_IMAGE' || parsed.read_successfully === false) {
+    return { ...normalizeAnalysis(parsed), read_successfully: false };
+  }
   return normalizeAnalysis(parsed);
 }
 
@@ -280,29 +318,55 @@ export async function* analyzeReceiptTextStream(
   }
 }
 
+/** Convert to cents: if value looks like dollars (has decimal or < 100) treat as dollars */
+function toCents(val: unknown): number {
+  const n = Number(val ?? 0);
+  if (Number.isNaN(n)) return 0;
+  if (n < 0) return 0;
+  // If it has decimal or is small, assume dollars
+  if (n < 100 || String(val).includes('.')) return Math.round(n * 100);
+  return Math.round(n);
+}
+
+/** Clamp deduction_percent to 100, 50, or 0 only */
+function clampDeductionPercent(pct: number): number {
+  if (pct >= 75) return 100;
+  if (pct >= 25 && pct < 75) return 50;
+  return 0;
+}
+
 function normalizeAnalysis(parsed: Record<string, unknown>): ReceiptAnalysis {
   const lineItems = Array.isArray(parsed.line_items) ? parsed.line_items : [];
-  const normalized = lineItems.map((item: Record<string, unknown>) => ({
-    description: String(item.description ?? ''),
-    amount: Number(item.amount ?? 0),
-    irs_category: String(item.irs_category ?? 'Other'),
-    deduction_percent: Number(item.deduction_percent ?? 0),
-    is_deductible: Boolean(item.is_deductible),
-    confidence: Math.min(1, Math.max(0, Number(item.confidence ?? 0.5))),
-    explanation: String(item.explanation ?? ''),
-    needs_more_context: Boolean(item.needs_more_context),
-    audit_risk_score: typeof item.audit_risk_score === 'number' ? Math.min(100, Math.max(0, item.audit_risk_score)) : undefined,
-  }));
+  const normalized = lineItems.map((item: Record<string, unknown>) => {
+    const amountCents = toCents(item.amount);
+    let pct = Number(item.deduction_percent ?? 0);
+    if (Number.isNaN(pct) || pct < 0) pct = 0;
+    const deductionPercent = clampDeductionPercent(pct);
+    const isDeductible = Boolean(item.is_deductible) && deductionPercent > 0;
+    return {
+      description: String(item.description ?? ''),
+      amount: amountCents,
+      irs_category: String(item.irs_category ?? 'Other'),
+      deduction_percent: deductionPercent,
+      is_deductible: isDeductible,
+      confidence: Math.min(1, Math.max(0, Number(item.confidence ?? 0.5))),
+      explanation: String(item.explanation ?? ''),
+      needs_more_context: Boolean(item.needs_more_context),
+      audit_risk_score: typeof item.audit_risk_score === 'number' ? Math.min(100, Math.max(0, item.audit_risk_score)) : undefined,
+    };
+  });
 
-  const totalAmount = normalized.reduce((sum, i) => sum + i.amount, 0) || Number(parsed.total_amount ?? parsed.amount ?? 0);
+  const totalCents = normalized.length > 0
+    ? normalized.reduce((sum, i) => sum + i.amount, 0)
+    : toCents(parsed.total_amount ?? parsed.amount ?? 0);
 
   return {
     merchant_name: String(parsed.merchant_name ?? 'Unknown'),
     date: parsed.date ? String(parsed.date) : null,
-    total_amount: totalAmount,
+    total_amount: totalCents,
     line_items: normalized.length > 0 ? normalized : [{
       description: 'Receipt total',
-      amount: totalAmount,
+      amount: totalCents,
       irs_category: 'Other',
       deduction_percent: 0,
       is_deductible: false,

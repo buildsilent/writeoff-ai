@@ -7,13 +7,13 @@ import { Header } from '@/components/Header';
 import { AppFooter } from '@/components/AppFooter';
 import { ScanResults } from '@/components/ScanResults';
 import { ScanCelebrationModal, getDeductionStatsFromResult } from '@/components/ScanCelebrationModal';
-import { LineItemCard } from '@/components/LineItemCard';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ScanSkeleton } from '@/components/Skeleton';
 import { Camera, FileText, Loader2, RotateCcw } from 'lucide-react';
 import { notifyScanComplete } from '@/hooks/useScansRealtime';
 import { useScanWorker } from '@/hooks/useScanWorker';
 import { compressImageForUpload } from '@/lib/image-compress';
+import { LiveCameraCapture } from '@/components/LiveCameraCapture';
 
 const FILE_INPUT_ID = 'receipt-file-input';
 const PROGRESS_MESSAGES = [
@@ -61,12 +61,21 @@ function ScanContent() {
   const [pendingText, setPendingText] = useState<string>('');
   const [categoryHint, setCategoryHint] = useState<string>('');
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
+  const [showLiveCamera, setShowLiveCamera] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { ready: workerReady, runScan, requestNotificationPermission } = useScanWorker();
 
-  // Stable dependency: only run when canceled param actually changes
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   useEffect(() => {
     if (canceledParam === '1') setCheckoutCanceled(true);
   }, [canceledParam]);
@@ -91,6 +100,18 @@ function ScanContent() {
     };
   }, []);
 
+  const setFileFromBlob = useCallback((blob: Blob) => {
+    const f = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
+    setFile(f);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(URL.createObjectURL(f));
+    setError(null);
+    setResult(null);
+    setFailedAttempts(0);
+    setFollowUpQuestion(null);
+    setPendingText('');
+  }, [previewUrl]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
     const f = input.files?.[0];
@@ -111,6 +132,11 @@ function ScanContent() {
     input.value = '';
   };
 
+  const handleCameraCapture = useCallback((blob: Blob) => {
+    setShowLiveCamera(false);
+    setFileFromBlob(blob);
+  }, [setFileFromBlob]);
+
   const handleRetake = () => {
     setFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -118,7 +144,8 @@ function ScanContent() {
     setResult(null);
     setError(null);
     setFailedAttempts(0);
-    fileInputRef.current?.click();
+    if (isMobile) setShowLiveCamera(true);
+    else fileInputRef.current?.click();
   };
 
   const handleSubmit = useCallback(async () => {
@@ -185,7 +212,9 @@ function ScanContent() {
             setMode('paste');
             setText("No worries — just type what was on your receipt in plain English and we'll handle the rest.");
           } else {
-            setError('We had trouble reading that receipt. Try taking the photo in better lighting or move closer.');
+            setError(
+              'We could not read this receipt clearly. Please try: 1) Better lighting 2) Hold the receipt flat 3) Move closer 4) Make sure the full receipt is in frame'
+            );
           }
         } else {
           setError(data?.message || "Something went wrong. Let's try again.");
@@ -224,7 +253,7 @@ function ScanContent() {
             );
           } else {
             setError(
-              'We had trouble reading that receipt. Try taking the photo in better lighting or move closer.'
+              'We could not read this receipt clearly. Please try: 1) Better lighting 2) Hold the receipt flat 3) Move closer 4) Make sure the full receipt is in frame'
             );
           }
         } else {
@@ -344,25 +373,50 @@ function ScanContent() {
                   </div>
                 </div>
               ) : (
-                <label
-                  htmlFor={FILE_INPUT_ID}
-                  className="group flex min-h-[320px] cursor-pointer flex-col items-center justify-center p-6"
-                >
+                <>
                   <input
                     ref={fileInputRef}
                     id={FILE_INPUT_ID}
                     type="file"
                     accept="image/jpeg,image/jpg,image/png,image/webp"
-                    capture="environment"
+                    capture={isMobile ? undefined : 'environment'}
                     onChange={handleFileChange}
                     className="absolute h-0 w-0 opacity-0"
                     aria-label="Select or take a photo of your receipt"
                   />
-                  <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-8 transition-colors group-hover:border-[#4F46E5]/30">
-                    <Camera className="h-20 w-20 text-[#4F46E5]" />
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && (isMobile ? setShowLiveCamera(true) : fileInputRef.current?.click())}
+                    onClick={() => {
+                      if (isMobile) setShowLiveCamera(true);
+                      else fileInputRef.current?.click();
+                    }}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const f = e.dataTransfer?.files?.[0];
+                      if (f?.type.startsWith('image/')) {
+                        setFile(f);
+                        if (previewUrl) URL.revokeObjectURL(previewUrl);
+                        setPreviewUrl(URL.createObjectURL(f));
+                        setError(null);
+                        setResult(null);
+                      } else if (f) setError('Please drop an image file (JPEG, PNG, or WebP)');
+                    }}
+                    className={`group flex min-h-[320px] cursor-pointer flex-col items-center justify-center rounded-[12px] border-2 border-dashed p-6 transition-colors ${
+                      isDragging ? 'border-[#4F46E5] bg-[#4F46E5]/10' : 'border-white/[0.12] hover:border-[#4F46E5]/50'
+                    }`}
+                  >
+                    <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-8 transition-colors group-hover:border-[#4F46E5]/30">
+                      <Camera className="h-20 w-20 text-[#4F46E5]" />
+                    </div>
+                    <p className="mt-6 text-base font-semibold text-white">Photo Scan</p>
+                    {!isMobile && <p className="mt-1 text-xs text-zinc-500">Click or drag & drop</p>}
                   </div>
-                  <p className="mt-6 text-base font-semibold text-white">Photo</p>
-                </label>
+                </>
               )}
             </div>
 
@@ -480,16 +534,25 @@ function ScanContent() {
               }}
               saved={saved}
             />
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => setShowStartOverConfirm(true)}
-                className="rounded-[10px] border border-white/[0.12] px-4 py-2 text-sm text-zinc-400 hover:bg-white/[0.04] hover:text-white"
+                className="min-h-[44px] cursor-pointer rounded-[12px] bg-[#4F46E5] px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#4338ca]"
               >
-                Start Over
+                Scan Another
               </button>
-              <Link href="/receipts" className="rounded-[10px] border border-[#4F46E5]/50 px-4 py-2 text-sm text-[#4F46E5] hover:bg-[#4F46E5]/10">
-                View receipts
+              <Link
+                href="/receipts"
+                className="flex min-h-[44px] cursor-pointer items-center justify-center rounded-[12px] border border-white/[0.12] px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-white/[0.06]"
+              >
+                View My Receipts
+              </Link>
+              <Link
+                href="/dashboard"
+                className="flex min-h-[44px] cursor-pointer items-center justify-center rounded-[12px] border border-white/[0.12] px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-white/[0.06]"
+              >
+                View Dashboard
               </Link>
             </div>
           </div>
@@ -519,10 +582,11 @@ function ScanContent() {
           </div>
         )}
 
-        {showCelebration && result && result.line_items && (
+        {showCelebration && result && (result as { id?: string }).id && (
           <ScanCelebrationModal
-            deductionCount={getDeductionStatsFromResult(result as Parameters<typeof getDeductionStatsFromResult>[0]).count}
-            estimatedSavingsCents={getDeductionStatsFromResult(result as Parameters<typeof getDeductionStatsFromResult>[0]).savingsCents}
+            scanId={(result as { id: string }).id}
+            fallbackDeductionCount={getDeductionStatsFromResult(result as Parameters<typeof getDeductionStatsFromResult>[0]).count}
+            fallbackSavingsCents={getDeductionStatsFromResult(result as Parameters<typeof getDeductionStatsFromResult>[0]).savingsCents}
             onScanAnother={resetForNewScan}
             onClose={() => setShowCelebration(false)}
           />
@@ -531,6 +595,12 @@ function ScanContent() {
 
       <AppFooter />
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+      {showLiveCamera && (
+        <LiveCameraCapture
+          onCapture={handleCameraCapture}
+          onClose={() => setShowLiveCamera(false)}
+        />
+      )}
     </div>
   );
 }

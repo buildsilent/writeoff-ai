@@ -27,6 +27,14 @@ export function LiveStatsCounter() {
     );
   }
 
+  if (totalCents === 0) {
+    return (
+      <p className="mt-4 text-sm text-zinc-500">
+        <span className="font-medium text-white">Be the first to find your deductions</span>
+      </p>
+    );
+  }
+
   return (
     <p className="mt-4 text-sm text-zinc-500">
       <span className="font-medium text-white">
