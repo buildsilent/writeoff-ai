@@ -27,16 +27,24 @@ interface ScanResultsProps {
 
 const DISCLAIMER = 'TaxSnapper provides estimates for informational purposes. Consult a licensed CPA for official tax advice.';
 
+// Normalize amounts to cents (OpenAI returns dollars)
+function toCents(dollars: number): number {
+  return Math.round((dollars ?? 0) * 100);
+}
+
 export function ScanResults({ result, saved }: ScanResultsProps) {
+  const totalCents = toCents(result.total_amount);
+  const lineItemsCents = result.line_items.map((li) => ({ ...li, amount: toCents(li.amount) }));
+
   return (
     <div className="mt-12 space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">{result.merchant_name}</h2>
-        <p className="text-sm text-zinc-500">Total: {formatCents(result.total_amount)}</p>
+        <p className="text-sm text-zinc-500">Total: {formatCents(totalCents)}</p>
       </div>
 
       <div className="space-y-4">
-        {result.line_items.map((item, idx) => (
+        {lineItemsCents.map((item, idx) => (
           <LineItemCard
             key={idx}
             item={item}

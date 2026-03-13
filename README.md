@@ -1,6 +1,8 @@
 # TaxSnapper
 
-Find hidden tax deductions in your receipts instantly. Upload a photo or paste receipt text, and our AI analyzes it to extract merchant, amount, date, category, and whether it's tax deductible—with the IRS category.
+Snap your receipts. Keep your money.
+
+Upload a photo or paste receipt text, and our AI analyzes it to extract merchant, amount, date, category, and whether it's tax deductible—with the IRS category.
 
 ## Tech Stack
 

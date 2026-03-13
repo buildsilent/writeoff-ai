@@ -8,7 +8,7 @@ import { AppFooter } from '@/components/AppFooter';
 import { ScanResults } from '@/components/ScanResults';
 import { LineItemCard } from '@/components/LineItemCard';
 import { UpgradeModal } from '@/components/UpgradeModal';
-import { Camera, FileText, Loader2, RotateCcw } from 'lucide-react';
+import { Camera, FileText, Loader2, RotateCcw, CheckCircle2, Receipt, LayoutDashboard } from 'lucide-react';
 import { notifyScanComplete } from '@/hooks/useScansRealtime';
 
 const FILE_INPUT_ID = 'receipt-file-input';
@@ -50,7 +50,6 @@ function ScanContent() {
   const [error, setError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [successMessage, setSuccessMessage] = useState(false);
   const [checkoutCanceled, setCheckoutCanceled] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
@@ -58,7 +57,6 @@ function ScanContent() {
   const [categoryHint, setCategoryHint] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMountedRef = useRef(true);
-  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Stable dependency: only run when canceled param actually changes
@@ -83,10 +81,6 @@ function ScanContent() {
     return () => {
       isMountedRef.current = false;
       if (abortControllerRef.current) abortControllerRef.current.abort();
-      if (successTimeoutRef.current) {
-        clearTimeout(successTimeoutRef.current);
-        successTimeoutRef.current = null;
-      }
     };
   }, []);
 
@@ -123,7 +117,6 @@ function ScanContent() {
   const handleSubmit = useCallback(async () => {
     setError(null);
     setResult(null);
-    setSuccessMessage(false);
 
     if (mode === 'upload') {
       if (!file) {
@@ -202,15 +195,8 @@ function ScanContent() {
       }
       setResult(data);
       setSaved(true);
-      setSuccessMessage(true);
       setFollowUpQuestion(null);
       notifyScanComplete();
-
-      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
-      successTimeoutRef.current = setTimeout(() => {
-        successTimeoutRef.current = null;
-        if (isMountedRef.current) setSuccessMessage(false);
-      }, 3000);
     } catch (err) {
       if (!isMountedRef.current) return;
       if ((err as Error).name === 'AbortError') return;
@@ -449,12 +435,6 @@ function ScanContent() {
           </div>
         )}
 
-        {successMessage && (
-          <div className="mt-6 rounded-[12px] border border-[#4F46E5]/30 bg-[#4F46E5]/10 p-4 text-center">
-            <p className="font-medium text-[#4F46E5]">Receipt scanned successfully — added to My Receipts</p>
-          </div>
-        )}
-
         {result && result.line_items && !loading && (
           <div className="mt-8">
             <ScanResults
@@ -466,16 +446,41 @@ function ScanContent() {
               }}
               saved={saved}
             />
-            <Link
-              href="/scan"
-              onClick={(e) => {
-                e.preventDefault();
-                resetForNewScan();
-              }}
-              className="btn-primary mt-6 flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-white/[0.12] bg-white/[0.02] py-3 text-sm font-medium text-white transition-all hover:bg-white/[0.06] hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]"
-            >
-              Scan another receipt
-            </Link>
+
+            {/* Post-scan prompts card */}
+            <div className="mt-8 rounded-[12px] border border-emerald-500/30 bg-emerald-500/10 p-6">
+              <div className="flex items-center gap-2 text-emerald-400">
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+                <p className="font-medium">Receipt saved to My Receipts ✓</p>
+              </div>
+              <p className="mt-1 text-sm text-zinc-400">What would you like to do next?</p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href="/scan"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    resetForNewScan();
+                  }}
+                  className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[12px] border border-white/[0.12] bg-white/[0.06] px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-white/[0.1]"
+                >
+                  Scan another receipt
+                </Link>
+                <Link
+                  href="/receipts"
+                  className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[12px] border border-[#4F46E5]/50 bg-[#4F46E5]/20 px-4 py-2.5 text-sm font-medium text-[#4F46E5] transition-all hover:bg-[#4F46E5]/30"
+                >
+                  <Receipt className="h-4 w-4" />
+                  View all my receipts
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[12px] border border-white/[0.12] bg-white/[0.06] px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-white/[0.1]"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  View my tax summary
+                </Link>
+              </div>
+            </div>
           </div>
         )}
       </main>

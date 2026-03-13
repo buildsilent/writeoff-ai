@@ -48,7 +48,7 @@ export default function LandingPage() {
             <span className="text-[#4F46E5]">every deduction</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-zinc-400 md:text-lg">
-            The AI-powered receipt scanner that finds, categorizes, and tracks every business expense.
+            Snap your receipts. Keep your money.
             Upload a photo or paste receipt text—get exact IRS categories in seconds.
           </p>
           <p className="mt-4 text-sm text-zinc-500">

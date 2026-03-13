@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TaxSnapper - Find Hidden Tax Deductions in Your Receipts",
-  description: "Upload a receipt and instantly discover tax deductions. AI-powered receipt analysis for freelancers and small business owners.",
+  title: "TaxSnapper - Snap your receipts. Keep your money.",
+  description: "Snap your receipts. Keep your money. AI-powered receipt analysis for freelancers and small business owners.",
 };
 
 export default function RootLayout({

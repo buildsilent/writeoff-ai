@@ -113,21 +113,53 @@ export async function POST(req: NextRequest) {
     const dateStr = result.date && /^\d{4}-\d{2}-\d{2}/.test(String(result.date))
       ? String(result.date).slice(0, 10)
       : new Date().toISOString().slice(0, 10);
+    // Store amounts in cents (OpenAI returns dollars) for consistency across DB and UI
+    const amountCents = Math.round((result.total_amount ?? 0) * 100);
+    const rawDataNormalized = {
+      ...result,
+      total_amount: amountCents,
+      line_items: result.line_items.map((li) => ({
+        ...li,
+        amount: Math.round((li.amount ?? 0) * 100),
+      })),
+    };
     const scanRow = {
       user_id: userId,
       merchant_name: result.merchant_name,
-      amount: result.total_amount,
+      amount: amountCents,
       date: dateStr,
       category: firstItem?.irs_category || null,
       is_deductible: result.line_items.some((li) => li.is_deductible),
       irs_category: firstItem?.irs_category || null,
-      raw_data: result,
+      raw_data: rawDataNormalized,
       receipt_image_url: receiptImageUrl,
     };
 
-    const { data: inserted } = await supabase.from('scans').insert(scanRow).select('id').single();
-    if (inserted) {
-      await supabase.from('scans_backup').insert({ ...scanRow, id: inserted.id });
+    console.log('[scan API] insert scanRow userId=', userId, 'merchant=', scanRow.merchant_name, 'amountCents=', amountCents);
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('scans')
+      .insert(scanRow)
+      .select('id')
+      .single();
+
+    if (insertError) {
+      console.error('[scan API] Supabase insert error:', insertError);
+      return NextResponse.json(
+        { error: 'SAVE_FAILED', message: 'Receipt was analyzed but could not be saved. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    console.log('[scan API] insert success id=', inserted?.id);
+
+    if (inserted?.id) {
+      const { error: backupError } = await supabase
+        .from('scans_backup')
+        .insert({ ...scanRow, id: inserted.id });
+      if (backupError) {
+        console.error('[scan API] scans_backup insert error (non-fatal):', backupError);
+      }
     }
 
     return NextResponse.json(result);
