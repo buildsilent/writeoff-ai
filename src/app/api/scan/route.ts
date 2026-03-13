@@ -110,11 +110,14 @@ export async function POST(req: NextRequest) {
     }
 
     const firstItem = result.line_items[0];
+    const dateStr = result.date && /^\d{4}-\d{2}-\d{2}/.test(String(result.date))
+      ? String(result.date).slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
     const scanRow = {
       user_id: userId,
       merchant_name: result.merchant_name,
       amount: result.total_amount,
-      date: result.date || null,
+      date: dateStr,
       category: firstItem?.irs_category || null,
       is_deductible: result.line_items.some((li) => li.is_deductible),
       irs_category: firstItem?.irs_category || null,

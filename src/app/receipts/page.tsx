@@ -15,6 +15,7 @@ import {
   FileText,
   Camera,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { getCategoryEmoji, getConfidenceLabel, getConfidenceColor } from '@/lib/constants';
 import { formatCents } from '@/lib/format';
@@ -194,8 +195,13 @@ function ReceiptCard({ scan, onClick }: { scan: Scan; onClick: () => void }) {
 }
 
 function ReceiptsContent() {
-  const { scans: scansData, loading, error } = useScansRealtime();
+  const { scans: scansData, loading, error, refetch } = useScansRealtime();
   const scans = (scansData || []) as Scan[];
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log('[ReceiptsContent] scans.length=', scans.length, 'loading=', loading, 'error=', error);
+    }
+  }, [scans.length, loading, error]);
   const [usage, setUsage] = useState<{ hasSubscription: boolean } | null>(null);
   const [authError, setAuthError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -227,19 +233,36 @@ function ReceiptsContent() {
   }, []);
 
   useEffect(() => {
+    if (scans.length > 0) setAuthError(false);
+  }, [scans.length]);
+
+  useEffect(() => {
     if (error && !loading) setAuthError(true);
   }, [error, loading]);
 
   useEffect(() => {
+    if (scans.length === 0) return;
     const years = new Set<number>();
+    let latestYear = 0;
+    let latestMonth = -1;
     for (const s of scans) {
       const d = (s.date || s.created_at?.slice(0, 10)) ? new Date(s.date || s.created_at) : new Date();
-      years.add(d.getFullYear());
+      const y = d.getFullYear();
+      const m = d.getMonth();
+      years.add(y);
+      if (y > latestYear || (y === latestYear && m > latestMonth)) {
+        latestYear = y;
+        latestMonth = m;
+      }
     }
-    if (years.size > 0 && expandedYears.size === 0) {
-      setExpandedYears(new Set([Math.max(...years)]));
+    const isInitialLoad = expandedYears.size === 0;
+    if (years.size > 0 && isInitialLoad) {
+      setExpandedYears(new Set([latestYear]));
+      if (latestYear > 0 && latestMonth >= 0) {
+        setExpandedMonths((prev) => new Set([...prev, `${latestYear}-${latestMonth}`]));
+      }
     }
-  }, [scans]);
+  }, [scans, expandedYears.size]);
 
   const filteredScans = useMemo(() => {
     let list = scans;
@@ -306,13 +329,20 @@ function ReceiptsContent() {
         <Header />
         <main className="mx-auto flex flex-1 flex-col items-center justify-center px-6 py-12">
           <p className="text-center text-zinc-400">Sign in to view your receipts</p>
-          <div className="mt-6 flex gap-4">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
             <Link href="/sign-in" className="btn-primary min-h-[44px] cursor-pointer rounded-[12px] bg-[#4F46E5] px-6 py-3 font-medium text-white">
               Sign in
             </Link>
             <Link href="/sign-up" className="min-h-[44px] cursor-pointer rounded-[12px] border border-white/[0.12] px-6 py-3 font-medium text-white">
               Sign up
             </Link>
+            <button
+              type="button"
+              onClick={() => { setAuthError(false); refetch(); }}
+              className="min-h-[44px] cursor-pointer rounded-[12px] border border-white/[0.12] px-6 py-3 font-medium text-zinc-400 transition-colors hover:text-white"
+            >
+              Retry load
+            </button>
           </div>
         </main>
         <AppFooter />
@@ -336,8 +366,21 @@ function ReceiptsContent() {
     <div className="flex min-h-screen flex-col bg-[#080B14]">
       <Header />
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6">
-        <h1 className="text-2xl font-semibold text-white">My Receipts</h1>
-        <p className="mt-1 text-sm text-zinc-500">View and organize your saved receipts</p>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">My Receipts</h1>
+            <p className="mt-1 text-sm text-zinc-500">View and organize your saved receipts</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[12px] border border-white/[0.08] bg-white/[0.02] px-4 py-2.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-white"
+            title="Refresh receipts"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+        </div>
 
         {/* Grand total banner */}
         {hasReceipts && (

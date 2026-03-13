@@ -15,28 +15,55 @@ export function useScansRealtime() {
   const [error, setError] = useState<boolean>(false);
 
   const refetch = useCallback(async () => {
+    if (!userId) {
+      setScans([]);
+      setLoading(false);
+      setError(true);
+      return;
+    }
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/api/scans` : '/api/scans';
+    if (typeof window !== 'undefined') {
+      console.log('[useScansRealtime] fetching', url, 'credentials: include');
+    }
     try {
-      const res = await fetch('/api/scans', { credentials: 'include' });
+      const res = await fetch(url, {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
+      const raw = await res.text();
+      if (typeof window !== 'undefined') {
+        console.log('[useScansRealtime] response status', res.status, 'body length', raw.length, 'preview', raw.slice(0, 200));
+      }
+      let data: unknown;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        console.error('[useScansRealtime] invalid JSON', raw.slice(0, 100));
+        setScans([]);
+        setError(true);
+        setLoading(false);
+        return;
+      }
       if (res.status === 401) {
         setScans([]);
         setError(true);
         setLoading(false);
         return;
       }
-      const data = await res.json();
       const arr = Array.isArray(data) ? data : [];
+      if (typeof window !== 'undefined') {
+        console.log('[useScansRealtime] parsed', arr.length, 'scans', Array.isArray(data) ? 'ok' : 'NOT ARRAY:', typeof data, data && typeof data === 'object' && 'error' in data ? (data as { error?: string }).error : '');
+      }
       setScans(arr);
       setError(false);
-      if (typeof window !== 'undefined') {
-        console.log('[useScansRealtime] fetched', arr.length, 'scans', arr.slice(0, 2));
-      }
     } catch (err) {
       if (typeof window !== 'undefined') console.error('[useScansRealtime] fetch error', err);
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     if (!isLoaded) return;
