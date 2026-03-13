@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useRef, useEffect } from 'react';
+import { Suspense, useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
@@ -21,6 +21,8 @@ const TYPE_PLACEHOLDER = 'e.g. Bought a ring light and backdrop from Amazon for 
 
 function ScanContent() {
   const searchParams = useSearchParams();
+  const canceledParam = searchParams?.get?.('canceled') ?? null;
+
   const [mode, setMode] = useState<'upload' | 'paste'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -42,18 +44,38 @@ function ScanContent() {
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
   const [pendingText, setPendingText] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMountedRef = useRef(true);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Stable dependency: only run when canceled param actually changes
   useEffect(() => {
-    if (searchParams.get('canceled') === '1') setCheckoutCanceled(true);
-  }, [searchParams]);
+    if (canceledParam === '1') setCheckoutCanceled(true);
+  }, [canceledParam]);
 
+  // Progress interval with cleanup on unmount
   useEffect(() => {
     if (!loading) return;
     const interval = setInterval(() => {
-      setProgressStep((s) => (s + 1) % PROGRESS_MESSAGES.length);
+      if (isMountedRef.current) {
+        setProgressStep((s) => (s + 1) % PROGRESS_MESSAGES.length);
+      }
     }, 1500);
     return () => clearInterval(interval);
   }, [loading]);
+
+  // Unmount cleanup: abort fetch, clear timers, prevent state updates
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
@@ -85,7 +107,7 @@ function ScanContent() {
     fileInputRef.current?.click();
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setError(null);
     setResult(null);
     setSuccessMessage(false);
@@ -109,6 +131,11 @@ function ScanContent() {
     const originalTextForRequest = mode === 'paste' && !followUpQuestion ? text.trim() : pendingText;
     if (mode === 'paste' && !followUpQuestion) setPendingText(originalTextForRequest);
 
+    // Cancel any in-flight scan
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     setLoading(true);
     try {
       const body: Record<string, unknown> =
@@ -122,9 +149,12 @@ function ScanContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal,
       });
 
       const data = await res.json();
+
+      if (!isMountedRef.current) return;
 
       if (!res.ok) {
         setLoading(false);
@@ -162,13 +192,20 @@ function ScanContent() {
       setSuccessMessage(true);
       setFollowUpQuestion(null);
       setPendingText('');
-      setTimeout(() => setSuccessMessage(false), 3000);
-    } catch {
+
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = setTimeout(() => {
+        successTimeoutRef.current = null;
+        if (isMountedRef.current) setSuccessMessage(false);
+      }, 3000);
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      if ((err as Error).name === 'AbortError') return; // User navigated away - silent
       setError("Something went wrong. Let's try that again — we're here to help.");
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     }
-  };
+  }, [mode, file, text, followUpQuestion, pendingText, failedAttempts]);
 
   const handleSwitchToText = () => {
     setMode('paste');
@@ -335,6 +372,17 @@ function ScanContent() {
                   {PROGRESS_MESSAGES[progressStep]}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (abortControllerRef.current) abortControllerRef.current.abort();
+                  setLoading(false);
+                  setError(null);
+                }}
+                className="mt-6 text-sm text-zinc-500 hover:text-white"
+              >
+                Cancel scan
+              </button>
             </div>
           </div>
         )}

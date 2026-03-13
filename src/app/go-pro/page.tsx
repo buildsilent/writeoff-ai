@@ -13,24 +13,33 @@ export default function GoProPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoaded) return;
-    if (!isSignedIn) return;
+    if (!isLoaded || !isSignedIn) return;
 
+    let isMounted = true;
     setRedirecting(true);
+
     fetch('/api/stripe/checkout', { method: 'POST' })
       .then((r) => r.json())
       .then((data) => {
         if (data.url) {
           window.location.href = data.url;
-        } else {
+          return;
+        }
+        if (isMounted) {
           setError(data.error || 'Failed to start checkout');
           setRedirecting(false);
         }
       })
       .catch(() => {
-        setError('Network error');
-        setRedirecting(false);
+        if (isMounted) {
+          setError('Network error');
+          setRedirecting(false);
+        }
       });
+
+    return () => {
+      isMounted = false;
+    };
   }, [isLoaded, isSignedIn]);
 
   if (!isLoaded) {

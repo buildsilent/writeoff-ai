@@ -156,12 +156,11 @@ function ReceiptsContent() {
   const thisMonth = new Date().getMonth();
 
   useEffect(() => {
+    let isMounted = true;
+
     Promise.all([
       fetch('/api/scans').then(async (r) => {
-        if (r.status === 401) {
-          setAuthError(true);
-          return [];
-        }
+        if (r.status === 401 && isMounted) setAuthError(true);
         return r.json();
       }),
       fetch('/api/usage').then(async (r) => {
@@ -169,6 +168,7 @@ function ReceiptsContent() {
         return { hasSubscription: false };
       }),
     ]).then(([scansData, usageData]) => {
+      if (!isMounted) return;
       setScans(Array.isArray(scansData) ? scansData : []);
       setUsage(usageData?.hasOwnProperty('hasSubscription') ? usageData : null);
       setLoading(false);
@@ -179,6 +179,10 @@ function ReceiptsContent() {
       }
       if (years.size > 0) setExpandedYears(new Set([Math.max(...years)]));
     });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const filteredScans = useMemo(() => {

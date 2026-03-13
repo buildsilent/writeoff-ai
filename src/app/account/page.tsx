@@ -29,13 +29,23 @@ function AccountContent() {
       router.push('/sign-in');
       return;
     }
+
+    let isMounted = true;
     fetch('/api/usage')
       .then((r) => r.json())
       .then((data) => {
-        setUsage(data?.hasOwnProperty('scanCount') ? data : null);
-        setLoading(false);
+        if (isMounted) {
+          setUsage(data?.hasOwnProperty('scanCount') ? data : null);
+          setLoading(false);
+        }
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [user, isLoaded, router]);
 
   const handleExport = async () => {

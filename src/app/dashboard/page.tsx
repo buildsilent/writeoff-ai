@@ -58,19 +58,22 @@ function DashboardContent() {
 
   const [authError, setAuthError] = useState(false);
 
+  const upgradedParam = searchParams?.get?.('upgraded') ?? null;
+
   useEffect(() => {
-    const justUpgraded = searchParams.get('upgraded') === '1';
+    let isMounted = true;
+    let pollTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const justUpgraded = upgradedParam === '1';
 
     Promise.all([
       fetch('/api/scans').then(async (r) => {
-        if (r.status === 401) {
-          setAuthError(true);
-          return [];
-        }
+        if (r.status === 401 && isMounted) setAuthError(true);
         return r.json();
       }),
       fetch('/api/usage').then((r) => r.json()),
     ]).then(([scansData, usageData]) => {
+      if (!isMounted) return;
       setScans(Array.isArray(scansData) ? scansData : []);
       setUsage(usageData?.hasOwnProperty('scanCount') ? usageData : null);
       setLoading(false);
@@ -78,16 +81,27 @@ function DashboardContent() {
       if (justUpgraded && !usageData?.hasSubscription) {
         let attempts = 0;
         const poll = () => {
+          if (!isMounted) return;
           attempts++;
-          fetch('/api/usage').then((r) => r.json()).then((u) => {
-            if (u?.hasSubscription) setUsage(u);
-            else if (attempts < 5) setTimeout(poll, 2000);
-          });
+          fetch('/api/usage')
+            .then((r) => r.json())
+            .then((u) => {
+              if (!isMounted) return;
+              if (u?.hasSubscription) setUsage(u);
+              else if (attempts < 5) {
+                pollTimeoutId = setTimeout(poll, 2000);
+              }
+            });
         };
-        setTimeout(poll, 2000);
+        pollTimeoutId = setTimeout(poll, 2000);
       }
     });
-  }, [searchParams]);
+
+    return () => {
+      isMounted = false;
+      if (pollTimeoutId) clearTimeout(pollTimeoutId);
+    };
+  }, [upgradedParam]);
 
   const thisYear = new Date().getFullYear();
   const { totalScans, totalDeductions, estimatedSaved, biggestCategory, monthlyData, categoryData, streakWeeks } = useMemo(() => {
