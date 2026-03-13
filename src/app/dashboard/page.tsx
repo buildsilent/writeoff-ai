@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { LineItemCard } from '@/components/LineItemCard';
+import { ReceiptImageModal } from '@/components/ReceiptImageModal';
 import { Upload, Check, Loader2, CreditCard, Camera, Download } from 'lucide-react';
 import { getCategoryEmoji } from '@/lib/constants';
 
@@ -23,6 +24,7 @@ interface Scan {
   merchant_name: string | null;
   amount: number;
   date: string | null;
+  receipt_image_url?: string | null;
   is_deductible?: boolean;
   irs_category?: string | null;
   raw_data?: {
@@ -47,6 +49,7 @@ interface FlattenedItem {
   merchantName: string;
   date: string | null;
   createdAt: string;
+  receiptImageUrl: string | null;
   item: LineItem;
 }
 
@@ -57,6 +60,7 @@ function flattenScansToItems(scans: Scan[]): FlattenedItem[] {
     const merchantName = raw?.merchant_name || scan.merchant_name || 'Unknown';
     const date = raw?.date || scan.date || scan.created_at?.slice(0, 10) || null;
 
+    const receiptImageUrl = scan.receipt_image_url || null;
     if (raw?.line_items && Array.isArray(raw.line_items)) {
       for (const item of raw.line_items) {
         items.push({
@@ -65,6 +69,7 @@ function flattenScansToItems(scans: Scan[]): FlattenedItem[] {
           merchantName,
           date,
           createdAt: scan.created_at || '',
+          receiptImageUrl,
           item,
         });
       }
@@ -75,6 +80,7 @@ function flattenScansToItems(scans: Scan[]): FlattenedItem[] {
         merchantName,
         date,
         createdAt: scan.created_at || '',
+        receiptImageUrl,
         item: {
           description: merchantName,
           amount: Number(scan.amount),
@@ -107,6 +113,7 @@ function DashboardContent() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [loading, setLoading] = useState(true);
   const [upgradeSuccess, setUpgradeSuccess] = useState(false);
+  const [receiptModalUrl, setReceiptModalUrl] = useState<string | null>(null);
 
   const fetchData = () =>
     Promise.all([
@@ -303,6 +310,8 @@ function DashboardContent() {
                             item={fi.item}
                             merchantName={fi.merchantName}
                             date={fi.date}
+                            receiptImageUrl={fi.receiptImageUrl}
+                            onReceiptClick={setReceiptModalUrl}
                           />
                         </div>
                       ))}
@@ -312,6 +321,13 @@ function DashboardContent() {
             </div>
           )}
         </div>
+
+        {receiptModalUrl && (
+          <ReceiptImageModal
+            imageUrl={receiptModalUrl}
+            onClose={() => setReceiptModalUrl(null)}
+          />
+        )}
       </main>
     </div>
   );

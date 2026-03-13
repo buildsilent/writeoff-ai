@@ -1,9 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { randomUUID } from 'crypto';
 import { analyzeReceiptImage, analyzeReceiptText } from '@/lib/openai';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { hasActiveSubscription } from '@/lib/subscription';
 import { FREE_SCAN_LIMIT } from '@/lib/stripe';
+
+const RECEIPTS_BUCKET = 'receipts';
+
+async function uploadReceiptImage(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userId: string,
+  imageBase64: string
+): Promise<string | null> {
+  try {
+    await supabase.storage.createBucket(RECEIPTS_BUCKET, { public: true }).catch(() => {});
+    const buffer = Buffer.from(imageBase64, 'base64');
+    const ext = imageBase64.startsWith('/9j/') ? 'jpg' : imageBase64.startsWith('iVBOR') ? 'png' : imageBase64.startsWith('UklGR') ? 'webp' : 'jpg';
+    const path = `${userId}/${randomUUID()}.${ext}`;
+
+    const contentType = ext === 'jpg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
+    const { error } = await supabase.storage.from(RECEIPTS_BUCKET).upload(path, buffer, {
+      contentType,
+      upsert: false,
+    });
+
+    if (error) {
+      console.error('Storage upload error:', error);
+      return null;
+    }
+
+    const { data } = supabase.storage.from(RECEIPTS_BUCKET).getPublicUrl(path);
+    return data.publicUrl;
+  } catch (err) {
+    console.error('Receipt image upload failed:', err);
+    return null;
+  }
+}
 
 async function getScanCount(userId: string): Promise<number> {
   const { count, error } = await getSupabaseAdmin()
@@ -40,12 +73,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid type. Use "image" or "text"' }, { status: 400 });
     }
 
+    const supabase = getSupabaseAdmin();
+
     let result;
+    let receiptImageUrl: string | null = null;
+
     if (type === 'image') {
       if (!imageBase64) {
         return NextResponse.json({ error: 'imageBase64 required for image scan' }, { status: 400 });
       }
       result = await analyzeReceiptImage(imageBase64);
+      receiptImageUrl = await uploadReceiptImage(supabase, userId, imageBase64);
     } else {
       if (!text || typeof text !== 'string') {
         return NextResponse.json({ error: 'text required for text scan' }, { status: 400 });
@@ -55,7 +93,7 @@ export async function POST(req: NextRequest) {
 
     const firstItem = result.line_items[0];
 
-    await getSupabaseAdmin().from('scans').insert({
+    await supabase.from('scans').insert({
       user_id: userId,
       merchant_name: result.merchant_name,
       amount: result.total_amount,
@@ -64,6 +102,7 @@ export async function POST(req: NextRequest) {
       is_deductible: result.line_items.some((li) => li.is_deductible),
       irs_category: firstItem?.irs_category || null,
       raw_data: result,
+      receipt_image_url: receiptImageUrl,
     });
 
     return NextResponse.json(result);

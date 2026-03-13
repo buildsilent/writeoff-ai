@@ -17,9 +17,11 @@ interface LineItemCardProps {
   item: LineItem;
   merchantName?: string;
   date?: string | null;
+  receiptImageUrl?: string | null;
+  onReceiptClick?: (url: string) => void;
 }
 
-export function LineItemCard({ item, merchantName, date }: LineItemCardProps) {
+export function LineItemCard({ item, merchantName, date, receiptImageUrl, onReceiptClick }: LineItemCardProps) {
   const emoji = getCategoryEmoji(item.irs_category);
   const confidenceLabel = getConfidenceLabel(item.confidence);
   const confidenceColor = getConfidenceColor(item.confidence);
@@ -27,6 +29,19 @@ export function LineItemCard({ item, merchantName, date }: LineItemCardProps) {
   return (
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
       <div className="flex items-start justify-between gap-4">
+        {receiptImageUrl && (
+          <button
+            type="button"
+            onClick={() => onReceiptClick?.(receiptImageUrl)}
+            className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.02] transition-opacity hover:opacity-90"
+          >
+            <img
+              src={receiptImageUrl}
+              alt="Receipt"
+              className="h-full w-full object-cover"
+            />
+          </button>
+        )}
         <div className="min-w-0 flex-1">
           <p className="font-medium text-white">{item.description}</p>
           {merchantName && (

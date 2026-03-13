@@ -14,8 +14,14 @@ create table if not exists scans (
   is_deductible boolean default false,
   irs_category text,
   raw_data jsonb,
+  receipt_image_url text,
   created_at timestamptz default now()
 );
+
+-- For existing deployments, add the receipt_image_url column:
+-- ALTER TABLE scans ADD COLUMN IF NOT EXISTS receipt_image_url text;
+
+-- Receipt images storage bucket: create via Storage > New bucket > name: receipts, public: true
 
 -- User subscriptions - tracks Stripe subscription status
 create table if not exists subscriptions (

@@ -8,11 +8,12 @@ export default async function SignUpPage({
 }) {
   const params = await searchParams;
   const goPro = params?.goPro === "1";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0a0a0a] p-6">
       <SignUp
-        fallbackRedirectUrl={goPro ? "/go-pro" : "/dashboard"}
+        fallbackRedirectUrl={goPro ? `${appUrl}/go-pro` : `${appUrl}/dashboard`}
         appearance={{
           variables: {
             colorPrimary: "#FF6B00",

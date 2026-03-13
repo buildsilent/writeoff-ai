@@ -33,13 +33,19 @@ Required variables:
 
 1. Create a project at [supabase.com](https://supabase.com)
 2. Run the SQL in `supabase/schema.sql` in the SQL Editor
-3. Get your project URL, anon key, and service role key from Settings → API
+3. For existing deployments, run: `ALTER TABLE scans ADD COLUMN IF NOT EXISTS receipt_image_url text;`
+4. Create a storage bucket: Storage → New bucket → name: `receipts`, Public: yes
+5. Get your project URL, anon key, and service role key from Settings → API
 
 ### 3. Clerk
 
 1. Create an application at [clerk.com](https://clerk.com)
 2. Configure sign-in/sign-up URLs and redirects
 3. Add the publishable and secret keys to `.env.local`
+4. **Set `NEXT_PUBLIC_APP_URL`** to your production URL (e.g. `https://your-app.vercel.app`) — required for Google OAuth redirects
+5. **Clerk Dashboard → Configure → Paths**: Set **Home URL** to your production app URL (e.g. `https://your-app.vercel.app`)
+6. **Clerk Dashboard → Configure → Paths**: Add your production URL to **Allowed redirect URLs** (e.g. `https://your-app.vercel.app/**`)
+7. **Disable phone sign-up**: User & Authentication → Email, Phone, Username → turn **off** "Phone number" for sign-up to remove friction
 
 ### 4. Stripe
 
