@@ -18,7 +18,14 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null);
+    if (!appUrl) {
+      return NextResponse.json(
+        { error: 'NEXT_PUBLIC_APP_URL must be set in production (e.g. https://taxsnapper.com) for Stripe redirects.' },
+        { status: 500 }
+      );
+    }
+    const baseUrl = appUrl.replace(/\/$/, '');
 
     const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
@@ -29,8 +36,8 @@ export async function POST() {
           quantity: 1,
         },
       ],
-      success_url: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/scan?canceled=1`,
+      success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/scan?canceled=1`,
       metadata: { clerk_user_id: userId },
       subscription_data: {
         metadata: { clerk_user_id: userId },

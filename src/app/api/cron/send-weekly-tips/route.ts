@@ -3,7 +3,11 @@ import { clerkClient } from '@clerk/nextjs/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error('RESEND_API_KEY is not set');
+  return new Resend(key);
+}
 
 const TAX_TIPS = [
   'Track every business mile from trip one. The IRS expects a contemporaneous log — use your phone or a simple spreadsheet.',
@@ -49,7 +53,7 @@ export async function GET(req: NextRequest) {
         const email = user.emailAddresses?.[0]?.emailAddress;
         if (!email) continue;
 
-        await resend.emails.send({
+        await getResend().emails.send({
           from: process.env.RESEND_FROM_EMAIL || 'TaxSnapper <onboarding@resend.dev>',
           to: email,
           subject: `Your weekly tax tip from TaxSnapper`,
