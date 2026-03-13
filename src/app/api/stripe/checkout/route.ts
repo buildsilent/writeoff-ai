@@ -20,20 +20,6 @@ export async function POST() {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-    // Clear any stored Stripe customer ID (e.g. from test mode) so we always create a fresh
-    // checkout session. This avoids "customer exists in test mode but live key used" errors.
-    await getSupabaseAdmin()
-      .from('subscriptions')
-      .update({
-        stripe_customer_id: null,
-        stripe_subscription_id: null,
-        status: 'incomplete',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', userId);
-
-    // Create fresh checkout session without reusing customer ID. Stripe will create a new
-    // customer when the user completes checkout; the webhook will save it.
     const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -43,7 +29,7 @@ export async function POST() {
           quantity: 1,
         },
       ],
-      success_url: `${appUrl}/success`,
+      success_url: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/scan?canceled=1`,
       metadata: { clerk_user_id: userId },
       subscription_data: {

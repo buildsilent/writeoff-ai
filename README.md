@@ -26,7 +26,7 @@ Required variables:
 - **Clerk**: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
 - **Supabase**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - **OpenAI**: `OPENAI_API_KEY`
-- **Stripe**: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`
+- **Stripe**: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` (webhook required for subscription sync)
 - **App**: `NEXT_PUBLIC_APP_URL`
 
 ### 2. Supabase
@@ -52,8 +52,8 @@ Required variables:
 1. Create a product with a $9.99/month recurring price
 2. Copy the Price ID (`price_xxx`) to `STRIPE_PRICE_ID`
 3. Set up a webhook endpoint: `https://yourdomain.com/api/stripe/webhook`
-4. Subscribe to: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
-5. Add the webhook signing secret to `STRIPE_WEBHOOK_SECRET`
+4. Subscribe to: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
+5. Add the webhook signing secret to `STRIPE_WEBHOOK_SECRET` (required for subscription sync)
 
 ### 5. OpenAI
 
@@ -78,7 +78,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Remember to:
 - Set `NEXT_PUBLIC_APP_URL` to your production URL (e.g. `https://taxsnapper.vercel.app`)
-- Configure Stripe webhooks: add endpoint `https://your-domain.com/api/stripe/webhook` and subscribe to `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+- Configure Stripe webhooks: add endpoint `https://your-domain.com/api/stripe/webhook` and subscribe to `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
 
 ## User Flow
 
