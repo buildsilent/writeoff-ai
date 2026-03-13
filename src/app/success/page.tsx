@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Header } from '@/components/Header';
+import { AppFooter } from '@/components/AppFooter';
 import { Check } from 'lucide-react';
 
 export default function SuccessPage() {
@@ -20,11 +21,12 @@ export default function SuccessPage() {
         </p>
         <Link
           href="/dashboard"
-          className="btn-primary mt-8 inline-flex rounded-xl bg-[#4F46E5] px-8 py-3.5 font-bold text-white"
+          className="btn-primary mt-8 inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-[12px] bg-[#4F46E5] px-8 py-3.5 font-bold text-white"
         >
           Back to dashboard
         </Link>
       </main>
+      <AppFooter />
     </div>
   );
 }

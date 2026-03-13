@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
+import { AppFooter } from '@/components/AppFooter';
 import { Loader2 } from 'lucide-react';
 
 export default function GoProPage() {
@@ -50,18 +51,19 @@ export default function GoProPage() {
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
             <Link
               href="/sign-up?goPro=1"
-              className="rounded-xl bg-[#4F46E5] px-8 py-3.5 font-bold text-white"
+              className="btn-primary min-h-[44px] cursor-pointer rounded-[12px] bg-[#4F46E5] px-8 py-3.5 font-bold text-white"
             >
               Sign up
             </Link>
             <Link
               href="/sign-in?redirect_url=/go-pro"
-              className="rounded-xl border border-white/[0.2] px-8 py-3.5 font-medium text-white"
+              className="min-h-[44px] cursor-pointer rounded-[12px] border border-white/[0.2] px-8 py-3.5 font-medium text-white"
             >
               Sign in
             </Link>
           </div>
         </main>
+        <AppFooter />
       </div>
     );
   }
@@ -82,6 +84,7 @@ export default function GoProPage() {
           </>
         ) : null}
       </main>
+      <AppFooter />
     </div>
   );
 }

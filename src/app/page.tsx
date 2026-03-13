@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Show } from '@clerk/nextjs';
 import { Header } from '@/components/Header';
+import { AppFooter } from '@/components/AppFooter';
 import { ExampleScanCard } from '@/components/ExampleScanCard';
 import { PricingSection } from '@/components/PricingSection';
 import { SavingsCalculator } from '@/components/SavingsCalculator';
@@ -51,7 +52,7 @@ export default function LandingPage() {
             Upload a photo or paste receipt text—get exact IRS categories in seconds.
           </p>
           <p className="mt-4 text-sm text-zinc-500">
-            <span className="font-medium text-white">1,247</span> deductions found so far
+            <span className="font-medium text-white">Trusted by 1,247 users</span> · 1,247 deductions found so far
           </p>
           <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Show when="signed-in">
@@ -222,24 +223,7 @@ export default function LandingPage() {
           </Show>
         </section>
 
-        {/* Footer */}
-        <footer className="mt-14 border-t border-white/[0.06] py-8">
-          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <Link href="/" className="font-medium text-white hover:opacity-80">
-              TaxSnapper
-            </Link>
-            <nav className="flex flex-wrap items-center justify-center gap-4">
-              <Link href="/" className="text-sm text-zinc-500 hover:text-white">Home</Link>
-              <Link href="/sign-in" className="text-sm text-zinc-500 hover:text-white">Sign in</Link>
-              <Link href="/sign-up" className="text-sm text-zinc-500 hover:text-white">Sign up</Link>
-              <Link href="/scan" className="text-sm text-zinc-500 hover:text-white">Scan</Link>
-              <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-white">Dashboard</Link>
-            </nav>
-          </div>
-          <p className="mt-6 text-center text-xs text-zinc-600">
-            TaxSnapper provides estimates for informational purposes. Consult a licensed CPA for official tax advice.
-          </p>
-        </footer>
+        <AppFooter />
       </main>
     </div>
   );
