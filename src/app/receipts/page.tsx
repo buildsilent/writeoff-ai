@@ -6,6 +6,8 @@ import { Header } from '@/components/Header';
 import { AppFooter } from '@/components/AppFooter';
 import { ReceiptDetailModal } from '@/components/ReceiptDetailModal';
 import { useScansRealtime } from '@/hooks/useScansRealtime';
+import { useUser } from '@clerk/nextjs';
+import { ExportModal } from '@/components/ExportModal';
 import {
   Folder,
   ChevronDown,
@@ -213,7 +215,8 @@ function ReceiptsContent() {
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [selectedScan, setSelectedScan] = useState<Scan | null>(null);
-  const [exporting, setExporting] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const { user } = useUser();
 
   const thisYear = new Date().getFullYear();
   const today = new Date();
@@ -303,25 +306,6 @@ function ReceiptsContent() {
     scans.forEach((s) => cats.add(getPrimaryCategory(s)));
     return ['All', ...Array.from(cats).sort((a, b) => (a === 'Not Deductible' ? 1 : b === 'Not Deductible' ? -1 : a.localeCompare(b)))];
   }, [scans]);
-
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const r = await fetch('/api/export');
-      if (!r.ok) throw new Error('Export failed');
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `taxsnapper-receipts-${thisYear}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      // Pro required
-    } finally {
-      setExporting(false);
-    }
-  };
 
   if (authError) {
     return (
@@ -447,17 +431,14 @@ function ReceiptsContent() {
               </select>
             </div>
 
-            {usage?.hasSubscription && (
-              <button
-                type="button"
-                onClick={handleExport}
-                disabled={exporting}
-                className="btn-primary flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[12px] border border-white/[0.12] bg-white/[0.02] px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-white/[0.06] hover:shadow-[0_0_20px_rgba(79,70,229,0.2)] disabled:opacity-50"
-              >
-                {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Export all receipts as CSV
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowExportModal(true)}
+              className="btn-primary flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[12px] border border-white/[0.12] bg-white/[0.02] px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-white/[0.06] hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </button>
           </div>
         )}
 
@@ -584,6 +565,13 @@ function ReceiptsContent() {
       )}
 
       <AppFooter />
+      {showExportModal && (
+        <ExportModal
+          scans={scans as import('@/lib/export-utils').ExportScan[]}
+          userName={user?.fullName ?? user?.firstName ?? null}
+          onClose={() => setShowExportModal(false)}
+        />
+      )}
     </div>
   );
 }

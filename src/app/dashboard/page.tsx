@@ -6,10 +6,12 @@ import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { AppFooter } from '@/components/AppFooter';
 import { useScansRealtime } from '@/hooks/useScansRealtime';
-import { Camera, Loader2 } from 'lucide-react';
+import { Camera, Loader2, Download } from 'lucide-react';
+import { useUser } from '@clerk/nextjs';
 import { getCategoryEmoji } from '@/lib/constants';
 import { formatCents } from '@/lib/format';
 import { EmailDigestBanner } from '@/components/EmailDigestBanner';
+import { ExportModal } from '@/components/ExportModal';
 
 interface LineItem {
   description: string;
@@ -60,6 +62,8 @@ function DashboardContent() {
 
   const tipIndex = useMemo(() => Math.floor(Math.random() * CPA_TIPS.length), []);
   const [authError, setAuthError] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const { user } = useUser();
   const upgradedParam = searchParams?.get?.('upgraded') ?? null;
 
   const loading = scansLoading || usageLoading;
@@ -228,14 +232,24 @@ function DashboardContent() {
 
         <EmailDigestBanner />
 
-        {/* Quick scan - prominent */}
-        <Link
-          href="/scan"
-          className="btn-primary mt-8 flex min-h-[56px] cursor-pointer items-center justify-center gap-3 rounded-[12px] bg-[#4F46E5] py-4 font-semibold text-white shadow-[0_4px_20px_rgba(79,70,229,0.4)] transition-all hover:shadow-[0_6px_28px_rgba(79,70,229,0.5)]"
-        >
-          <Camera className="h-6 w-6" />
-          Scan a receipt
-        </Link>
+        {/* Quick scan + Export */}
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            href="/scan"
+            className="btn-primary flex min-h-[56px] flex-1 cursor-pointer items-center justify-center gap-3 rounded-[12px] bg-[#4F46E5] py-4 font-semibold text-white shadow-[0_4px_20px_rgba(79,70,229,0.4)] transition-all hover:shadow-[0_6px_28px_rgba(79,70,229,0.5)] min-w-[200px]"
+          >
+            <Camera className="h-6 w-6" />
+            Scan a receipt
+          </Link>
+          <button
+            type="button"
+            onClick={() => setShowExportModal(true)}
+            className="flex min-h-[56px] cursor-pointer items-center justify-center gap-3 rounded-[12px] border border-white/[0.12] bg-white/[0.02] px-6 py-4 font-semibold text-white transition-all hover:bg-white/[0.06]"
+          >
+            <Download className="h-6 w-6" />
+            Export
+          </button>
+        </div>
 
         {/* Annual summary */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -344,6 +358,13 @@ function DashboardContent() {
         </div>
       </main>
       <AppFooter />
+      {showExportModal && (
+        <ExportModal
+          scans={scans as import('@/lib/export-utils').ExportScan[]}
+          userName={user?.fullName ?? user?.firstName ?? null}
+          onClose={() => setShowExportModal(false)}
+        />
+      )}
     </div>
   );
 }
