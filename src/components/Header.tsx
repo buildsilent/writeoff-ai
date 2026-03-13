@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { UserButton, Show } from '@clerk/nextjs';
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
@@ -16,6 +16,7 @@ const NAV_TABS = [
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (href: string) => {
@@ -40,6 +41,7 @@ export function Header() {
             <Link
               key={href}
               href={href}
+              onMouseEnter={() => href === '/scan' && router.prefetch('/scan')}
               className={`min-h-[44px] min-w-[44px] cursor-pointer rounded-[12px] px-3 py-2.5 text-sm font-medium transition-colors hover:bg-white/[0.06] ${
                 isActive(href) ? 'text-white' : 'text-zinc-400 hover:text-white'
               }`}
@@ -68,6 +70,7 @@ export function Header() {
           <Show when="signed-in">
             <Link
               href="/scan"
+              onMouseEnter={() => router.prefetch('/scan')}
               className="btn-primary hidden cursor-pointer rounded-[12px] bg-[#4F46E5] px-4 py-2.5 text-sm font-medium text-white shadow-[0_2px_12px_rgba(79,70,229,0.4)] transition-all hover:shadow-[0_4px_20px_rgba(79,70,229,0.5)] sm:inline-block"
             >
               Scan Now
@@ -95,6 +98,7 @@ export function Header() {
               <Link
                 key={href}
                 href={href}
+                onMouseEnter={() => href === '/scan' && router.prefetch('/scan')}
                 onClick={() => setMobileOpen(false)}
                 className={`min-h-[44px] cursor-pointer rounded-[12px] px-4 py-3 text-base font-medium transition-colors ${
                   isActive(href)

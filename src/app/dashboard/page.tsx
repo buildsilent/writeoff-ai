@@ -21,6 +21,7 @@ import {
 } from '@/lib/tax-insights';
 import { EmailDigestBanner } from '@/components/EmailDigestBanner';
 import { ExportModal } from '@/components/ExportModal';
+import { DashboardSkeleton } from '@/components/Skeleton';
 
 interface LineItem {
   description: string;
@@ -190,8 +191,8 @@ function DashboardContent() {
     return (
       <div className="flex min-h-screen flex-col bg-[#080B14]">
         <Header />
-        <main className="flex flex-1 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[#4F46E5]" />
+        <main className="flex flex-1">
+          <DashboardSkeleton />
         </main>
         <AppFooter />
       </div>

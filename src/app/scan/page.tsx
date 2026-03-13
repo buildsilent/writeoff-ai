@@ -10,9 +10,11 @@ import { ScanCelebrationModal, getDeductionStatsFromResult } from '@/components/
 import { LineItemCard } from '@/components/LineItemCard';
 import { ReceiptRequirementsReminder } from '@/components/ReceiptRequirementsReminder';
 import { UpgradeModal } from '@/components/UpgradeModal';
+import { ScanSkeleton } from '@/components/Skeleton';
 import { Camera, FileText, Loader2, RotateCcw, CheckCircle2, Receipt, LayoutDashboard } from 'lucide-react';
 import { notifyScanComplete } from '@/hooks/useScansRealtime';
 import { useScanWorker } from '@/hooks/useScanWorker';
+import { compressImageForUpload } from '@/lib/image-compress';
 
 const FILE_INPUT_ID = 'receipt-file-input';
 const PROGRESS_MESSAGES = [
@@ -148,7 +150,7 @@ function ScanContent() {
     const base = { categoryHint: hintVal, clientLocalDate };
     const body: Record<string, unknown> =
       mode === 'upload'
-        ? { ...base, type: 'image', imageBase64: await fileToBase64(file!) }
+        ? { ...base, type: 'image', imageBase64: await compressImageForUpload(file!) }
         : followUpQuestion
           ? { ...base, type: 'text', originalText: pendingText, followUpAnswer: text.trim() }
           : { ...base, type: 'text', text: originalTextForRequest };
@@ -560,24 +562,16 @@ function ScanContent() {
   );
 }
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(',')[1] || '');
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function ScanPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#080B14]">
-          <Loader2 className="h-6 w-6 animate-spin text-[#4F46E5]" />
+        <div className="flex min-h-screen flex-col bg-[#080B14]">
+          <Header />
+          <main className="flex flex-1">
+            <ScanSkeleton />
+          </main>
+          <AppFooter />
         </div>
       }
     >

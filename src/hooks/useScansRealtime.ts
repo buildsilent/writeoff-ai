@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { supabase } from '@/lib/supabase';
+import { getCachedScans, setCachedScans } from '@/lib/scans-cache';
 
 export const SCAN_COMPLETE_EVENT = 'taxsnapper:scan-complete';
 export const SCANS_REFRESH_CHANNEL = 'taxsnapper-scans-refresh';
@@ -10,7 +11,7 @@ export const SCANS_REFRESH_CHANNEL = 'taxsnapper-scans-refresh';
 export function useScansRealtime() {
   const { user, isLoaded } = useUser();
   const userId = user?.id ?? null;
-  const [scans, setScans] = useState<unknown[]>([]);
+  const [scans, setScans] = useState<unknown[]>(() => getCachedScans(userId) ?? []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<boolean>(false);
 
@@ -56,6 +57,7 @@ export function useScansRealtime() {
         console.log('[useScansRealtime] parsed', arr.length, 'scans', Array.isArray(data) ? 'ok' : 'NOT ARRAY:', typeof data, data && typeof data === 'object' && 'error' in data ? (data as { error?: string }).error : '');
       }
       setScans(arr);
+      if (userId) setCachedScans(userId, arr);
       setError(false);
     } catch (err) {
       if (typeof window !== 'undefined') console.error('[useScansRealtime] fetch error', err);
@@ -68,6 +70,11 @@ export function useScansRealtime() {
   useEffect(() => {
     if (!isLoaded) return;
     let mounted = true;
+    const cached = userId ? getCachedScans(userId) : null;
+    if (cached && cached.length >= 0) {
+      setScans(cached);
+      setLoading(false);
+    }
     refetch();
 
     const onScanComplete = () => {
