@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 
+type ScanFollowUp = { followUpQuestion: string; partialResult?: unknown };
 type ScanResultHandler = (result: {
   ok: boolean;
   result?: unknown;
-  followUp?: unknown;
+  followUp?: ScanFollowUp;
   error?: unknown;
   status?: number;
 }) => void;
