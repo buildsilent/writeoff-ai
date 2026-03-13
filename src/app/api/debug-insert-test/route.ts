@@ -37,7 +37,18 @@ export async function GET() {
 
     return NextResponse.json({
       config: { hasServiceRoleKey: hasKey, supabaseUrl: url ? `${url.slice(0, 30)}...` : 'missing' },
-      insert: { data, error: error ? { message: error.message, code: error.code, details: error.details } : null },
+      insert: {
+        data,
+        error: error
+          ? {
+              message: error.message,
+              code: error.code,
+              details: error.details,
+              hint: (error as { hint?: string }).hint,
+              full: JSON.stringify(error),
+            }
+          : null,
+      },
     });
   } catch (err) {
     return NextResponse.json({

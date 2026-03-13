@@ -109,7 +109,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const firstItem = result.line_items[0];
+    const lineItems = result.line_items ?? [];
+    const firstItem = lineItems[0];
     const dateStr = result.date && /^\d{4}-\d{2}-\d{2}/.test(String(result.date))
       ? String(result.date).slice(0, 10)
       : new Date().toISOString().slice(0, 10);
@@ -118,21 +119,34 @@ export async function POST(req: NextRequest) {
     const rawDataNormalized = {
       ...result,
       total_amount: amountCents,
-      line_items: result.line_items.map((li) => ({
+      line_items: lineItems.map((li) => ({
         ...li,
         amount: Math.round((li.amount ?? 0) * 100),
       })),
     };
+    // Ensure raw_data is valid JSON (PostgREST/JSONB requires serializable data)
+    let rawDataSafe: Record<string, unknown>;
+    try {
+      rawDataSafe = JSON.parse(JSON.stringify(rawDataNormalized)) as Record<string, unknown>;
+    } catch (jsonErr) {
+      console.error('[scan API] raw_data JSON serialize error:', jsonErr);
+      return NextResponse.json(
+        { error: 'SAVE_FAILED', message: 'Receipt data could not be serialized.' },
+        { status: 500 }
+      );
+    }
+    // Schema: id, user_id, merchant_name, amount, date, category, is_deductible, irs_category, raw_data (jsonb), receipt_image_url, created_at
+    // Note: line_items lives inside raw_data, NOT as a separate column
     const scanRow = {
       user_id: userId,
-      merchant_name: result.merchant_name,
+      merchant_name: result.merchant_name ?? null,
       amount: amountCents,
       date: dateStr,
-      category: firstItem?.irs_category || null,
-      is_deductible: result.line_items.some((li) => li.is_deductible),
-      irs_category: firstItem?.irs_category || null,
-      raw_data: rawDataNormalized,
-      receipt_image_url: receiptImageUrl,
+      category: (firstItem?.irs_category as string | null) ?? null,
+      is_deductible: lineItems.some((li) => li.is_deductible),
+      irs_category: (firstItem?.irs_category as string | null) ?? null,
+      raw_data: rawDataSafe,
+      receipt_image_url: receiptImageUrl ?? null,
     };
 
     // Nuclear debug: BEFORE insert
@@ -140,20 +154,10 @@ export async function POST(req: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '(missing)';
     console.log('[scan API] === BEFORE INSERT ===');
     console.log('[scan API] Using getSupabaseAdmin (SUPABASE_SERVICE_ROLE_KEY):', hasServiceRole, '| Supabase URL:', supabaseUrl);
-    console.log('[scan API] scanRow EXACT data:', JSON.stringify({
-      user_id: scanRow.user_id,
-      merchant_name: scanRow.merchant_name,
-      amount: scanRow.amount,
-      date: scanRow.date,
-      category: scanRow.category,
-      is_deductible: scanRow.is_deductible,
-      irs_category: scanRow.irs_category,
-      receipt_image_url: scanRow.receipt_image_url,
-      raw_data_keys: scanRow.raw_data ? Object.keys(scanRow.raw_data) : null,
-    }));
+    console.log('[scan API] scanRow (schema columns only):', JSON.stringify(scanRow, null, 2));
 
     let inserted: { id: string } | null = null;
-    let insertError: { message?: string; code?: string; details?: unknown } | null = null;
+    let insertError: unknown = null;
     try {
       const res = await supabase
         .from('scans')
@@ -163,27 +167,35 @@ export async function POST(req: NextRequest) {
       inserted = res.data;
       insertError = res.error;
     } catch (insertThrow) {
-      console.error('[scan API] INSERT THREW (unexpected):', insertThrow);
+      console.error('[scan API] INSERT THREW (unexpected):');
+      console.error('[scan API] Full error:', insertThrow);
+      console.error('[scan API] Error JSON:', JSON.stringify(insertThrow, ['message', 'code', 'details', 'hint', 'stack', 'name'], 2));
+      console.error('[scan API] Error message:', insertThrow instanceof Error ? insertThrow.message : String(insertThrow));
+      console.error('[scan API] Error stack:', insertThrow instanceof Error ? insertThrow.stack : 'N/A');
       return NextResponse.json(
         { error: 'SAVE_FAILED', message: 'Insert threw: ' + (insertThrow instanceof Error ? insertThrow.message : String(insertThrow)) },
         { status: 500 }
       );
     }
 
-    // Nuclear debug: AFTER insert
+    // Nuclear debug: AFTER insert - log FULL error object
     console.log('[scan API] === AFTER INSERT ===');
-    console.log('[scan API] Supabase response:', JSON.stringify({
-      data: inserted,
-      error: insertError,
-      errorMessage: insertError?.message,
-      errorCode: insertError?.code,
-      errorDetails: insertError?.details,
-    }));
-
+    console.log('[scan API] inserted:', inserted ? JSON.stringify(inserted) : 'null');
     if (insertError) {
-      console.error('[scan API] Supabase insert FAILED:', insertError);
+      const err = insertError as { message?: string; code?: string; details?: string; hint?: string };
+      console.error('[scan API] Supabase insert FAILED - FULL ERROR:');
+      console.error('[scan API] error.message:', err?.message);
+      console.error('[scan API] error.code:', err?.code);
+      console.error('[scan API] error.details:', err?.details);
+      console.error('[scan API] error.hint:', err?.hint);
+      console.error('[scan API] Full error JSON:', JSON.stringify(insertError, null, 2));
+      const errMsg = (insertError as { message?: string })?.message;
       return NextResponse.json(
-        { error: 'SAVE_FAILED', message: 'Receipt was analyzed but could not be saved. Please try again.' },
+        {
+          error: 'SAVE_FAILED',
+          message: 'Receipt was analyzed but could not be saved. Please try again.',
+          debug: process.env.NODE_ENV === 'development' && errMsg ? { supabaseError: errMsg } : undefined,
+        },
         { status: 500 }
       );
     }
