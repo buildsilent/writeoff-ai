@@ -44,8 +44,12 @@ export default function GoProPage() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-[#080B14] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#4F46E5]" />
+      <div className="flex min-h-screen flex-col bg-[#080B14]">
+        <Header />
+        <main className="flex flex-1 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[#4F46E5]" />
+        </main>
+        <AppFooter />
       </div>
     );
   }
@@ -54,7 +58,7 @@ export default function GoProPage() {
     return (
       <div className="min-h-screen bg-[#080B14]">
         <Header />
-        <main className="mx-auto max-w-lg px-6 py-24 text-center">
+        <main className="mx-auto w-full max-w-lg px-4 py-24 text-center sm:px-6">
           <h1 className="text-2xl font-semibold text-white">Sign in to go Pro</h1>
           <p className="mt-4 text-zinc-500">Create an account or sign in to upgrade to TaxSnapper Pro.</p>
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
@@ -78,9 +82,9 @@ export default function GoProPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080B14] flex flex-col items-center justify-center">
+    <div className="flex min-h-screen flex-col bg-[#080B14]">
       <Header />
-      <main className="text-center px-6">
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-4 text-center sm:px-6">
         {redirecting ? (
           <>
             <Loader2 className="h-12 w-12 animate-spin text-[#4F46E5] mx-auto" />

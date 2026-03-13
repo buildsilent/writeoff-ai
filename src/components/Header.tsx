@@ -80,10 +80,10 @@ export function Header() {
             type="button"
             onClick={() => setMobileOpen((o) => !o)}
             className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[12px] text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white md:hidden"
-              aria-label="Toggle menu"
-            >
-              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </div>
 

@@ -45,7 +45,7 @@ export function ScanResults({ result, saved }: ScanResultsProps) {
         ))}
       </div>
 
-      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+      <div className="rounded-[12px] border border-amber-500/20 bg-amber-500/5 px-4 py-3">
         <p className="text-xs text-amber-200/90 leading-relaxed">{DISCLAIMER}</p>
       </div>
 

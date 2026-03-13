@@ -7,7 +7,7 @@ export default function SuccessPage() {
   return (
     <div className="min-h-screen bg-[#080B14]">
       <Header />
-      <main className="mx-auto max-w-lg px-6 py-16 text-center">
+      <main className="mx-auto w-full max-w-lg px-4 py-16 text-center sm:px-6">
         <div className="flex justify-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#4F46E5]/20">
             <Check className="h-8 w-8 text-[#4F46E5]" />

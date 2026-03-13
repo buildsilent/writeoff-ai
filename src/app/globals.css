@@ -34,6 +34,21 @@ button, [role="button"], a[href] {
   cursor: pointer;
 }
 
+/* Consistent page container - centered, aligned */
+.page-container {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 72rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+@media (min-width: 640px) {
+  .page-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
 @keyframes gradient-shift {
   0%, 100% { opacity: 0.5; transform: scale(1) translate(0, 0); }
   33% { opacity: 0.7; transform: scale(1.05) translate(2%, 1%); }

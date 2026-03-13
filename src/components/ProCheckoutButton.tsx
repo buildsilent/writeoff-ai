@@ -37,7 +37,7 @@ export function ProCheckoutButton({ children, className = '', variant = 'primary
     }
   };
 
-  const baseClass = 'btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-base font-bold transition-opacity disabled:opacity-50';
+  const baseClass = 'btn-primary inline-flex items-center justify-center gap-2 rounded-[12px] px-8 py-3.5 text-base font-bold transition-opacity disabled:opacity-50';
   const primaryClass = 'bg-[#4F46E5] text-white shadow-[0_4px_14px_rgba(79,70,229,0.4)]';
   const secondaryClass = 'border-2 border-[#4F46E5] text-[#4F46E5] hover:bg-[#4F46E5]/10';
 

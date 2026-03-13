@@ -113,7 +113,7 @@ export default function LandingPage() {
           <p className="mx-auto mt-2 max-w-lg text-center text-sm text-zinc-500">
             Built for content creators and small business owners
           </p>
-          <div className="mt-8 overflow-x-auto rounded-lg border border-white/[0.06]">
+          <div className="mt-8 overflow-x-auto rounded-[12px] border border-white/[0.06]">
             <table className="w-full min-w-[520px] text-left text-sm">
               <thead>
                 <tr className="border-b border-white/[0.06] bg-white/[0.02]">
@@ -184,7 +184,7 @@ export default function LandingPage() {
             ].map((t) => (
               <div
                 key={t.role}
-                className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
+                className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4"
               >
                 <span className="text-xl">{t.emoji}</span>
                 <p className="mt-1.5 text-xs font-medium uppercase tracking-wider text-zinc-500">{t.role}</p>
@@ -198,7 +198,7 @@ export default function LandingPage() {
         </section>
 
         {/* Footer CTA + Footer */}
-        <section className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-6 py-10 text-center md:px-10">
+        <section className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-4 py-10 text-center sm:px-6 md:px-10">
           <h2 className="text-xl font-semibold text-white md:text-2xl">
             Stop leaving money on the table
           </h2>

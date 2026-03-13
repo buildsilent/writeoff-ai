@@ -27,7 +27,7 @@ export function LineItemCard({ item, merchantName, date, receiptImageUrl, onRece
   const confidenceColor = getConfidenceColor(item.confidence);
 
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-5">
       <div className="flex items-start justify-between gap-4">
         {receiptImageUrl && (
           <button

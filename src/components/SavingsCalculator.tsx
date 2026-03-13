@@ -29,14 +29,14 @@ export function SavingsCalculator() {
       <p className="text-sm text-zinc-500 mb-6">
         Select your work type and estimated monthly business spending. We&apos;ll show you a realistic tax savings estimate.
       </p>
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 md:p-6">
+        <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-5 md:p-6">
         <div className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-white mb-2">I&apos;m a...</label>
             <select
               value={jobType}
               onChange={(e) => setJobType(e.target.value)}
-              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+              className="w-full rounded-[12px] border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
             >
               {JOB_TYPES.map((j) => (
                 <option key={j.id} value={j.id} className="bg-[#080B14] text-white">
@@ -55,12 +55,12 @@ export function SavingsCalculator() {
                 step="50"
                 value={monthlySpend}
                 onChange={(e) => setMonthlySpend(e.target.value)}
-                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3 pl-8 pr-4 text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+                className="w-full rounded-[12px] border border-white/[0.08] bg-white/[0.02] py-3 pl-8 pr-4 text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
               />
             </div>
           </div>
         </div>
-        <div className="mt-6 rounded-xl border border-[#4F46E5]/30 bg-[#4F46E5]/5 p-4">
+        <div className="mt-6 rounded-[12px] border border-[#4F46E5]/30 bg-[#4F46E5]/5 p-4">
           <p className="text-sm text-zinc-500">Estimated annual tax savings</p>
           <p className="mt-1.5 text-3xl font-bold text-[#4F46E5]">${estimatedSavings.toLocaleString()}</p>
           <p className="mt-2 text-xs text-zinc-500">

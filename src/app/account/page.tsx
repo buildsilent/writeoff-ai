@@ -189,7 +189,7 @@ function AccountContent() {
             >
               <span
                 className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${
-                  notifications ? 'left-[26px]' : 'left-1'
+                  notifications ? 'left-6' : 'left-1'
                 }`}
               />
             </button>

@@ -67,22 +67,23 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { type, imageBase64, text, followUpAnswer, originalText } = body;
+    const { type, imageBase64, text, followUpAnswer, originalText, stream: wantStream, categoryHint } = body;
 
     if (!type || (type !== 'image' && type !== 'text')) {
       return NextResponse.json({ error: 'Invalid type. Use "image" or "text"' }, { status: 400 });
     }
 
+    const hint = typeof categoryHint === 'string' && categoryHint && categoryHint !== 'not_sure' ? categoryHint : undefined;
     const supabase = getSupabaseAdmin();
 
-    let result;
+    let result: Awaited<ReturnType<typeof analyzeReceiptImage>>;
     let receiptImageUrl: string | null = null;
 
     if (type === 'image') {
       if (!imageBase64) {
         return NextResponse.json({ error: 'imageBase64 required for image scan' }, { status: 400 });
       }
-      result = await analyzeReceiptImage(imageBase64);
+      result = await analyzeReceiptImage(imageBase64, hint);
       receiptImageUrl = await uploadReceiptImage(supabase, userId, imageBase64);
     } else {
       const textInput = followUpAnswer ? originalText : text;
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'text required for text scan' }, { status: 400 });
       }
       const textToAnalyze = followUpAnswer ? originalText : text;
-      const textResult = await analyzeReceiptText(textToAnalyze, followUpAnswer);
+      const textResult = await analyzeReceiptText(textToAnalyze, followUpAnswer, hint);
       if (textResult.followUpQuestion) {
         return NextResponse.json({
           followUpQuestion: textResult.followUpQuestion,
@@ -124,6 +125,35 @@ export async function POST(req: NextRequest) {
     const { data: inserted } = await supabase.from('scans').insert(scanRow).select('id').single();
     if (inserted) {
       await supabase.from('scans_backup').insert({ ...scanRow, id: inserted.id });
+    }
+
+    if (wantStream) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          const send = (event: string, data: unknown) => {
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+          };
+          send('meta', {
+            merchant_name: result.merchant_name,
+            date: result.date,
+            total_amount: result.total_amount,
+          });
+          for (const item of result.line_items) {
+            await new Promise((r) => setTimeout(r, 80));
+            send('item', item);
+          }
+          send('done', {});
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
     }
 
     return NextResponse.json(result);

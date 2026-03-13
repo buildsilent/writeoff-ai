@@ -11,7 +11,7 @@ export default async function SignUpPage({
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#080B14] p-6">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#080B14] px-4 py-8 sm:px-6">
       <SignUp
         fallbackRedirectUrl={goPro ? `${appUrl}/go-pro` : `${appUrl}/dashboard`}
         appearance={{

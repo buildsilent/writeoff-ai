@@ -323,8 +323,8 @@ function ReceiptsContent() {
               ))}
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <span className="mr-2 self-center text-xs text-zinc-500">Sort:</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-zinc-500">Sort:</span>
               {(['newest', 'oldest', 'highest_amount', 'most_deductions'] as const).map((s) => (
                 <button
                   key={s}

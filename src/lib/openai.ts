@@ -75,6 +75,11 @@ const IMAGE_PROMPT = `${CPA_SYSTEM}
 
 Set "read_successfully": false ONLY when the image is blurry, too dark, rotated, or otherwise unreadable. If you can extract any items, set true.`;
 
+function withCategoryHint(prompt: string, hint?: string): string {
+  if (!hint || hint === 'not_sure') return prompt;
+  return `${prompt}\n\nADDITIONAL CONTEXT (user indicated purchase type - use to improve categorization): "${hint}"`;
+}
+
 const TEXT_PROMPT = `${CPA_SYSTEM}
 If you need ONE critical piece of information to determine deductibility (e.g., "Was this for business or personal use?"), include "follow_up_question" and minimal line_items. Otherwise return full analysis.
 {
@@ -103,8 +108,9 @@ They answered your follow-up: "{answer}"
 
 Using both, generate the complete receipt analysis. Return the same JSON format.`;
 
-export async function analyzeReceiptImage(base64Image: string): Promise<ReceiptAnalysis> {
+export async function analyzeReceiptImage(base64Image: string, hint?: string): Promise<ReceiptAnalysis> {
   const openai = getOpenAI();
+  const prompt = withCategoryHint(IMAGE_PROMPT, hint);
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
     max_tokens: 2000,
@@ -117,7 +123,7 @@ export async function analyzeReceiptImage(base64Image: string): Promise<ReceiptA
       {
         role: 'user',
         content: [
-          { type: 'text', text: IMAGE_PROMPT },
+          { type: 'text', text: prompt },
           {
             type: 'image_url',
             image_url: {
@@ -137,12 +143,14 @@ export async function analyzeReceiptImage(base64Image: string): Promise<ReceiptA
 
 export async function analyzeReceiptText(
   text: string,
-  followUpAnswer?: string
+  followUpAnswer?: string,
+  hint?: string
 ): Promise<{ result: ReceiptAnalysis; followUpQuestion?: string }> {
   const openai = getOpenAI();
+  const prompt = withCategoryHint(TEXT_PROMPT, hint);
   const userContent = followUpAnswer
     ? FOLLOW_UP_PROMPT.replace('{text}', text).replace('{answer}', followUpAnswer)
-    : `User's plain English receipt description:\n\n"${text}"\n\n${TEXT_PROMPT}`;
+    : `User's plain English receipt description:\n\n"${text}"\n\n${prompt}`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
@@ -172,6 +180,79 @@ export async function analyzeReceiptText(
   }
 
   return { result: normalizeAnalysis(parsed) };
+}
+
+export async function* analyzeReceiptImageStream(
+  base64Image: string,
+  hint?: string
+): AsyncGenerator<ReceiptAnalysis> {
+  const openai = getOpenAI();
+  const prompt = withCategoryHint(IMAGE_PROMPT, hint);
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    max_tokens: 2000,
+    stream: true,
+    messages: [
+      { role: 'system', content: 'You are a senior CPA. Return only valid JSON. No markdown.' },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          {
+            type: 'image_url',
+            image_url: {
+              url: base64Image.startsWith('data:') ? base64Image : `data:image/jpeg;base64,${base64Image}`,
+            },
+          },
+        ],
+      },
+    ],
+  });
+
+  let content = '';
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content ?? '';
+    content += delta;
+  }
+  const cleaned = content.replace(/```json\n?|\n?```/g, '').trim();
+  const parsed = JSON.parse(cleaned || '{}');
+  yield normalizeAnalysis(parsed);
+}
+
+export async function* analyzeReceiptTextStream(
+  text: string,
+  followUpAnswer?: string,
+  hint?: string
+): AsyncGenerator<{ result: ReceiptAnalysis; followUpQuestion?: string }> {
+  const openai = getOpenAI();
+  const prompt = withCategoryHint(TEXT_PROMPT, hint);
+  const userContent = followUpAnswer
+    ? FOLLOW_UP_PROMPT.replace('{text}', text).replace('{answer}', followUpAnswer)
+    : `User's plain English receipt description:\n\n"${text}"\n\n${prompt}`;
+
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    max_tokens: 2000,
+    stream: true,
+    messages: [
+      { role: 'system', content: 'You are a senior CPA. Return only valid JSON. No markdown.' },
+      { role: 'user', content: userContent },
+    ],
+  });
+
+  let content = '';
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content ?? '';
+    content += delta;
+  }
+  const cleaned = content.replace(/```json\n?|\n?```/g, '').trim();
+  const parsed = JSON.parse(cleaned || '{}');
+
+  if (parsed.follow_up_question) {
+    yield { result: normalizeAnalysis(parsed), followUpQuestion: String(parsed.follow_up_question) };
+  } else {
+    yield { result: normalizeAnalysis(parsed) };
+  }
 }
 
 function normalizeAnalysis(parsed: Record<string, unknown>): ReceiptAnalysis {

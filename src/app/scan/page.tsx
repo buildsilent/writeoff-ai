@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { AppFooter } from '@/components/AppFooter';
 import { ScanResults } from '@/components/ScanResults';
+import { LineItemCard } from '@/components/LineItemCard';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { Camera, FileText, Loader2, RotateCcw } from 'lucide-react';
 
@@ -18,6 +19,16 @@ const PROGRESS_MESSAGES = [
 ];
 
 const TYPE_PLACEHOLDER = 'e.g. Bought a ring light and backdrop from Amazon for $89 for my content studio';
+
+const CATEGORY_OPTIONS = [
+  { value: '', label: 'Not Sure', sub: 'Skip if unsure, AI will figure it out' },
+  { value: 'Business Purchase', label: 'Business Purchase' },
+  { value: 'Meal or Entertainment', label: 'Meal or Entertainment' },
+  { value: 'Travel', label: 'Travel' },
+  { value: 'Home Office', label: 'Home Office' },
+  { value: 'Vehicle', label: 'Vehicle' },
+  { value: 'Personal (not deductible)', label: 'Personal (not deductible)' },
+] as const;
 
 function ScanContent() {
   const searchParams = useSearchParams();
@@ -32,7 +43,7 @@ function ScanContent() {
   const [result, setResult] = useState<{
     line_items?: unknown[];
     merchant_name?: string;
-    date?: string;
+    date?: string | null;
     total_amount?: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +54,9 @@ function ScanContent() {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
   const [pendingText, setPendingText] = useState<string>('');
+  const [categoryHint, setCategoryHint] = useState<string>('');
+  const [streamingItems, setStreamingItems] = useState<unknown[]>([]);
+  const [streamingMeta, setStreamingMeta] = useState<{ merchant_name?: string; date?: string; total_amount?: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMountedRef = useRef(true);
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -111,6 +125,8 @@ function ScanContent() {
     setError(null);
     setResult(null);
     setSuccessMessage(false);
+    setStreamingItems([]);
+    setStreamingMeta(null);
 
     if (mode === 'upload') {
       if (!file) {
@@ -138,12 +154,13 @@ function ScanContent() {
 
     setLoading(true);
     try {
+      const hintVal = categoryHint && categoryHint !== 'Not Sure' ? categoryHint : undefined;
       const body: Record<string, unknown> =
         mode === 'upload'
-          ? { type: 'image', imageBase64: await fileToBase64(file!) }
+          ? { type: 'image', imageBase64: await fileToBase64(file!), stream: true, categoryHint: hintVal }
           : followUpQuestion
-            ? { type: 'text', originalText: pendingText, followUpAnswer: text.trim() }
-            : { type: 'text', text: originalTextForRequest };
+            ? { type: 'text', originalText: pendingText, followUpAnswer: text.trim(), categoryHint: hintVal }
+            : { type: 'text', text: originalTextForRequest, stream: true, categoryHint: hintVal };
 
       const res = await fetch('/api/scan', {
         method: 'POST',
@@ -152,11 +169,11 @@ function ScanContent() {
         signal,
       });
 
-      const data = await res.json();
-
-      if (!isMountedRef.current) return;
+      const contentType = res.headers.get('content-type') ?? '';
 
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (!isMountedRef.current) return;
         setLoading(false);
         if (data.error === 'FREE_LIMIT_REACHED') {
           setShowUpgrade(true);
@@ -180,18 +197,70 @@ function ScanContent() {
         return;
       }
 
-      if (data.followUpQuestion) {
-        setFollowUpQuestion(data.followUpQuestion);
-        setText('');
-        setLoading(false);
-        return;
-      }
+      if (contentType.includes('text/event-stream')) {
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        const items: unknown[] = [];
+        let meta: { merchant_name?: string; date?: string; total_amount?: number } | null = null;
 
-      setResult(data);
-      setSaved(true);
-      setSuccessMessage(true);
-      setFollowUpQuestion(null);
-      setPendingText('');
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() ?? '';
+            for (const block of lines) {
+              const eventMatch = block.match(/event: (\w+)/);
+              const dataMatch = block.match(/data: (.+)/);
+              if (eventMatch && dataMatch) {
+                try {
+                  const data = JSON.parse(dataMatch[1]);
+                  if (eventMatch[1] === 'meta') {
+                    meta = data;
+                    if (isMountedRef.current) setStreamingMeta(meta);
+                  } else if (eventMatch[1] === 'item') {
+                    items.push(data);
+                    if (isMountedRef.current) setStreamingItems([...items]);
+                  }
+                } catch {
+                  // skip parse errors
+                }
+              }
+            }
+          }
+        }
+
+        if (!isMountedRef.current) return;
+        setLoading(false);
+        setResult({
+          merchant_name: meta?.merchant_name ?? 'Unknown',
+          date: meta?.date ?? null,
+          total_amount: meta?.total_amount ?? 0,
+          line_items: items,
+        });
+        setSaved(true);
+        setSuccessMessage(true);
+        setFollowUpQuestion(null);
+        setPendingText('');
+        setStreamingItems([]);
+        setStreamingMeta(null);
+      } else {
+        const data = await res.json();
+        if (!isMountedRef.current) return;
+        if (data.followUpQuestion) {
+          setFollowUpQuestion(data.followUpQuestion);
+          setText('');
+          setLoading(false);
+          return;
+        }
+        setResult(data);
+        setSaved(true);
+        setSuccessMessage(true);
+        setFollowUpQuestion(null);
+        setPendingText('');
+      }
 
       if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
       successTimeoutRef.current = setTimeout(() => {
@@ -200,12 +269,12 @@ function ScanContent() {
       }, 3000);
     } catch (err) {
       if (!isMountedRef.current) return;
-      if ((err as Error).name === 'AbortError') return; // User navigated away - silent
+      if ((err as Error).name === 'AbortError') return;
       setError("Something went wrong. Let's try that again — we're here to help.");
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
-  }, [mode, file, text, followUpQuestion, pendingText, failedAttempts]);
+  }, [mode, file, text, followUpQuestion, pendingText, failedAttempts, categoryHint]);
 
   const handleSwitchToText = () => {
     setMode('paste');
@@ -227,6 +296,8 @@ function ScanContent() {
     setResult(null);
     setError(null);
     setFollowUpQuestion(null);
+    setStreamingItems([]);
+    setStreamingMeta(null);
   };
 
   return (
@@ -241,6 +312,36 @@ function ScanContent() {
           <p className="mt-3 text-sm text-zinc-500">
             Checkout was canceled. Upgrade anytime when you&apos;re ready.
           </p>
+        )}
+
+        {/* Follow-up question - TOP of page, prominent, no scrolling needed */}
+        {!result && !loading && followUpQuestion && (
+          <div className="mt-6 rounded-[12px] border-2 border-[#4F46E5] bg-[#4F46E5]/15 p-4 shadow-[0_0_20px_rgba(79,70,229,0.2)]">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#4F46E5]">Question for you</p>
+            <p className="mt-2 text-base font-medium text-white">{followUpQuestion}</p>
+          </div>
+        )}
+
+        {/* Optional category selector - above upload area */}
+        {!result && !loading && (
+          <div className="mt-6 w-full max-w-md">
+            <label htmlFor="category-hint" className="block text-sm font-medium text-white">
+              Optional: What type of purchase is this?
+            </label>
+            <select
+              id="category-hint"
+              value={categoryHint}
+              onChange={(e) => setCategoryHint(e.target.value)}
+              className="mt-2 w-full min-h-[44px] rounded-[12px] border border-white/[0.08] bg-white/[0.02] px-4 py-2.5 text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+            >
+              {CATEGORY_OPTIONS.map((opt) => (
+                <option key={opt.value || 'empty'} value={opt.value} className="bg-[#080B14] text-white">
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-zinc-500">Skip if unsure, AI will figure it out</p>
+          </div>
         )}
 
         {/* Two big cards - side by side, same height. Only when no result and not loading */}
@@ -346,15 +447,36 @@ function ScanContent() {
           </div>
         )}
 
-        {/* Follow-up question overlay - when we need one more answer */}
-        {!result && !loading && followUpQuestion && (
-          <div className="mt-6 rounded-[12px] border border-[#4F46E5]/30 bg-[#4F46E5]/10 p-4">
-            <p className="text-sm font-medium text-white">{followUpQuestion}</p>
+        {/* Streaming results - show cards as they arrive */}
+        {(loading && (streamingMeta || streamingItems.length > 0)) && (
+          <div className="mt-8 space-y-6">
+            {streamingMeta && (
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">{streamingMeta.merchant_name ?? 'Analyzing...'}</h2>
+                <p className="text-sm text-zinc-500">
+                  {streamingMeta.total_amount != null ? `Total: $${Number(streamingMeta.total_amount).toFixed(2)}` : ''}
+                </p>
+              </div>
+            )}
+            <div className="space-y-4">
+              {streamingItems.map((item, idx) => (
+                <LineItemCard
+                  key={idx}
+                  item={item as Parameters<typeof LineItemCard>[0]['item']}
+                  merchantName={streamingMeta?.merchant_name}
+                  date={streamingMeta?.date ?? null}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-zinc-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Analyzing more items...
+            </div>
           </div>
         )}
 
-        {/* Loading state */}
-        {loading && (
+        {/* Loading state - no streaming results yet */}
+        {loading && !streamingMeta && streamingItems.length === 0 && (
           <div className="mt-8 rounded-[12px] border border-white/[0.08] bg-white/[0.02] p-8">
             <div className="flex flex-col items-center">
               <Loader2 className="h-12 w-12 animate-spin text-[#4F46E5]" />

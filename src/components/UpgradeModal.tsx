@@ -38,14 +38,14 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6">
-      <div className="w-full max-w-sm rounded-xl border border-white/[0.06] bg-[#080B14] p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6">
+      <div className="w-full max-w-sm rounded-[12px] border border-white/[0.06] bg-[#080B14] p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Upgrade to Pro</h2>
           <button
             onClick={onClose}
             type="button"
-            className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:text-white"
+            className="rounded-[12px] p-1.5 text-zinc-500 transition-colors hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -53,7 +53,7 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
         <p className="mt-3 text-sm text-zinc-500">
           You&apos;ve used your 3 free scans. Upgrade for unlimited receipt scans.
         </p>
-        <div className="mt-6 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+        <div className="mt-6 rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
           <p className="text-xl font-semibold text-white">
             $9.99<span className="text-sm font-normal text-zinc-500">/month</span>
           </p>
@@ -72,7 +72,7 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
             onClick={onClose}
             type="button"
             disabled={loading}
-            className="flex-1 rounded-lg border border-white/[0.08] py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
+            className="flex-1 rounded-[12px] border border-white/[0.08] py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
           >
             Maybe later
           </button>
@@ -80,7 +80,7 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
             onClick={handleUpgrade}
             type="button"
             disabled={loading}
-            className="btn-primary flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#4F46E5] py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            className="btn-primary flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-[#4F46E5] py-2.5 text-sm font-medium text-white disabled:opacity-50"
           >
             {loading ? (
               <>
