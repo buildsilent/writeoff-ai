@@ -129,11 +129,14 @@ They answered your follow-up: "{answer}"
 
 Using both, generate the complete receipt analysis. Return the same JSON format.`;
 
-export async function analyzeReceiptImage(base64Image: string, hint?: string): Promise<ReceiptAnalysis> {
+export const RECEIPT_MODEL_MINI = 'gpt-4o-mini';
+export const RECEIPT_MODEL_FULL = 'gpt-4o';
+
+export async function analyzeReceiptImage(base64Image: string, hint?: string, model: string = RECEIPT_MODEL_MINI): Promise<ReceiptAnalysis> {
   const openai = getOpenAI();
   const prompt = withCategoryHint(IMAGE_PROMPT, hint);
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model,
     max_tokens: 2000,
     response_format: { type: 'json_object' },
     messages: [
@@ -165,7 +168,8 @@ export async function analyzeReceiptImage(base64Image: string, hint?: string): P
 export async function analyzeReceiptText(
   text: string,
   followUpAnswer?: string,
-  hint?: string
+  hint?: string,
+  model: string = RECEIPT_MODEL_MINI
 ): Promise<{ result: ReceiptAnalysis; followUpQuestion?: string }> {
   const openai = getOpenAI();
   const prompt = withCategoryHint(TEXT_PROMPT, hint);
@@ -174,7 +178,7 @@ export async function analyzeReceiptText(
     : `User's plain English receipt description:\n\n"${text}"\n\n${prompt}`;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model,
     max_tokens: 2000,
     response_format: { type: 'json_object' },
     messages: [

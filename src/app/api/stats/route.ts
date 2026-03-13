@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 300;
+export const revalidate = 3600;
 
 export async function GET() {
   try {
@@ -32,7 +32,7 @@ export async function GET() {
 
     return NextResponse.json(
       { totalDeductionsCents: totalCents },
-      { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } }
+      { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200' } }
     );
   } catch (err) {
     console.error('[stats API]', err);

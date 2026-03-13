@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { randomUUID } from 'crypto';
-import { analyzeReceiptImage, analyzeReceiptText } from '@/lib/openai';
+import { analyzeReceiptImage, analyzeReceiptText, RECEIPT_MODEL_MINI, RECEIPT_MODEL_FULL } from '@/lib/openai';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { hasActiveSubscription } from '@/lib/subscription';
 import { FREE_SCAN_LIMIT } from '@/lib/stripe';
@@ -83,7 +83,10 @@ export async function POST(req: NextRequest) {
       if (!imageBase64) {
         return NextResponse.json({ error: 'imageBase64 required for image scan' }, { status: 400 });
       }
-      result = await analyzeReceiptImage(imageBase64, hint);
+      result = await analyzeReceiptImage(imageBase64, hint, RECEIPT_MODEL_MINI);
+      if ((result.line_items?.length ?? 0) > 10) {
+        result = await analyzeReceiptImage(imageBase64, hint, RECEIPT_MODEL_FULL);
+      }
       receiptImageUrl = await uploadReceiptImage(supabase, userId, imageBase64);
     } else {
       const textInput = followUpAnswer ? originalText : text;
@@ -91,12 +94,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'text required for text scan' }, { status: 400 });
       }
       const textToAnalyze = followUpAnswer ? originalText : text;
-      const textResult = await analyzeReceiptText(textToAnalyze, followUpAnswer, hint);
+      let textResult = await analyzeReceiptText(textToAnalyze, followUpAnswer, hint, RECEIPT_MODEL_MINI);
       if (textResult.followUpQuestion) {
         return NextResponse.json({
           followUpQuestion: textResult.followUpQuestion,
           partialResult: textResult.result,
         });
+      }
+      if ((textResult.result.line_items?.length ?? 0) > 10) {
+        textResult = await analyzeReceiptText(textToAnalyze, followUpAnswer, hint, RECEIPT_MODEL_FULL);
       }
       result = textResult.result;
     }
@@ -214,13 +220,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Return response with amounts in CENTS - single source of truth for all clients
-    const responseWithCents = {
-      ...result,
-      total_amount: amountCents,
-      line_items: rawDataNormalized.line_items,
-    };
-    return NextResponse.json(responseWithCents);
+    // Return the SAVED Supabase row so celebration popup and dashboard numbers match exactly
+    const { data: savedScan } = await supabase
+      .from('scans')
+      .select('*')
+      .eq('id', inserted!.id)
+      .single();
+
+    if (!savedScan) {
+      return NextResponse.json(
+        { error: 'SAVE_OK_FETCH_FAILED', message: 'Scan saved but could not retrieve. Check My Receipts.' },
+        { status: 500 }
+      );
+    }
+
+    const raw = savedScan.raw_data as { line_items?: unknown[]; merchant_name?: string; date?: string } | null;
+    return NextResponse.json({
+      id: savedScan.id,
+      merchant_name: savedScan.merchant_name ?? raw?.merchant_name,
+      date: savedScan.date ?? raw?.date ?? null,
+      total_amount: Number(savedScan.amount),
+      line_items: raw?.line_items ?? [],
+    });
   } catch (err) {
     console.error('Scan error:', err);
     return NextResponse.json(

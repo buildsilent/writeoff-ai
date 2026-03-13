@@ -8,10 +8,9 @@ import { AppFooter } from '@/components/AppFooter';
 import { ScanResults } from '@/components/ScanResults';
 import { ScanCelebrationModal, getDeductionStatsFromResult } from '@/components/ScanCelebrationModal';
 import { LineItemCard } from '@/components/LineItemCard';
-import { ReceiptRequirementsReminder } from '@/components/ReceiptRequirementsReminder';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ScanSkeleton } from '@/components/Skeleton';
-import { Camera, FileText, Loader2, RotateCcw, CheckCircle2, Receipt, LayoutDashboard } from 'lucide-react';
+import { Camera, FileText, Loader2, RotateCcw } from 'lucide-react';
 import { notifyScanComplete } from '@/hooks/useScansRealtime';
 import { useScanWorker } from '@/hooks/useScanWorker';
 import { compressImageForUpload } from '@/lib/image-compress';
@@ -27,7 +26,7 @@ const PROGRESS_MESSAGES = [
 const TYPE_PLACEHOLDER = 'e.g. Bought a ring light and backdrop from Amazon for $89 for my content studio';
 
 const CATEGORY_OPTIONS = [
-  { value: '', label: 'Not Sure', sub: 'Skip if unsure, AI will figure it out' },
+  { value: '', label: 'Not Sure' },
   { value: 'Business Purchase', label: 'Business Purchase' },
   { value: 'Meal or Entertainment', label: 'Meal or Entertainment' },
   { value: 'Travel', label: 'Travel' },
@@ -61,6 +60,7 @@ function ScanContent() {
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
   const [pendingText, setPendingText] = useState<string>('');
   const [categoryHint, setCategoryHint] = useState<string>('');
+  const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -267,6 +267,7 @@ function ScanContent() {
   };
 
   const resetForNewScan = () => {
+    setShowStartOverConfirm(false);
     setMode('upload');
     setFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -282,43 +283,29 @@ function ScanContent() {
     <div className="min-h-screen bg-[#080B14]">
       <Header />
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <h1 className="text-2xl font-semibold text-white">Scan a receipt</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Take a photo or type it out — we&apos;ll find every deduction
-        </p>
-        {checkoutCanceled && (
-          <p className="mt-3 text-sm text-zinc-500">
-            Checkout was canceled. Upgrade anytime when you&apos;re ready.
-          </p>
-        )}
+        {checkoutCanceled && <p className="mb-4 text-sm text-zinc-500">Checkout canceled. Upgrade anytime.</p>}
 
-        {/* Follow-up question - TOP of page, prominent, no scrolling needed */}
-        {!result && !loading && followUpQuestion && (
-          <div className="mt-6 rounded-[12px] border-2 border-[#4F46E5] bg-[#4F46E5]/15 p-4 shadow-[0_0_20px_rgba(79,70,229,0.2)]">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#4F46E5]">Question for you</p>
-            <p className="mt-2 text-base font-medium text-white">{followUpQuestion}</p>
-          </div>
-        )}
-
-        {/* Optional category selector - above upload area */}
+        {/* Category hint at top */}
         {!result && !loading && (
-          <div className="mt-6 w-full max-w-md">
-            <label htmlFor="category-hint" className="block text-sm font-medium text-white">
-              Optional: What type of purchase is this?
-            </label>
+          <div className="mb-4">
             <select
               id="category-hint"
               value={categoryHint}
               onChange={(e) => setCategoryHint(e.target.value)}
-              className="mt-2 w-full min-h-[44px] rounded-[12px] border border-white/[0.08] bg-white/[0.02] px-4 py-2.5 text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+              className="w-full max-w-xs min-h-[40px] rounded-[10px] border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-sm text-white focus:border-[#4F46E5] focus:outline-none"
             >
               {CATEGORY_OPTIONS.map((opt) => (
-                <option key={opt.value || 'empty'} value={opt.value} className="bg-[#080B14] text-white">
+                <option key={opt.value || 'empty'} value={opt.value} className="bg-[#080B14]">
                   {opt.label}
                 </option>
               ))}
             </select>
-            <p className="mt-1.5 text-xs text-zinc-500">Skip if unsure, AI will figure it out</p>
+          </div>
+        )}
+
+        {!result && !loading && followUpQuestion && (
+          <div className="mb-4 rounded-[12px] border border-[#4F46E5] bg-[#4F46E5]/10 p-3">
+            <p className="text-sm font-medium text-white">{followUpQuestion}</p>
           </div>
         )}
 
@@ -374,22 +361,16 @@ function ScanContent() {
                   <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-8 transition-colors group-hover:border-[#4F46E5]/30">
                     <Camera className="h-20 w-20 text-[#4F46E5]" />
                   </div>
-                  <p className="mt-6 text-lg font-semibold text-white">Photo Scan</p>
-                  <p className="mt-2 text-center text-sm text-zinc-500">Tap anywhere to open camera</p>
+                  <p className="mt-6 text-base font-semibold text-white">Photo</p>
                 </label>
               )}
             </div>
 
             {/* Type It Out card */}
             <div className="flex min-h-[320px] flex-col rounded-[12px] border-2 border-dashed border-white/[0.12] bg-white/[0.02] p-6 transition-all hover:border-[#4F46E5]/50">
-              <div className="flex items-center gap-3">
-                <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
-                  <FileText className="h-10 w-10 text-[#4F46E5]" />
-                </div>
-                <div>
-                  <p className="text-lg font-semibold text-white">Type It Out</p>
-                  <p className="text-sm text-zinc-500">Describe your receipt</p>
-                </div>
+              <div className="flex items-center gap-2">
+                <FileText className="h-8 w-8 text-[#4F46E5]" />
+                <p className="text-base font-semibold text-white">Type it out</p>
               </div>
               <textarea
                 value={text}
@@ -489,7 +470,7 @@ function ScanContent() {
         )}
 
         {result && result.line_items && !loading && (
-          <div className="mt-8">
+          <div className="mt-6">
             <ScanResults
               result={{
                 merchant_name: result.merchant_name || 'Unknown',
@@ -499,48 +480,40 @@ function ScanContent() {
               }}
               saved={saved}
             />
-
-            <div className="mt-6">
-              <ReceiptRequirementsReminder
-                merchantName={result.merchant_name || ''}
-                date={result.date || null}
-                amount={Number(result.total_amount) ?? 0}
-                hasDeductibleItems={(result.line_items as Array<{ is_deductible?: boolean }>).some((li) => li.is_deductible)}
-              />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setShowStartOverConfirm(true)}
+                className="rounded-[10px] border border-white/[0.12] px-4 py-2 text-sm text-zinc-400 hover:bg-white/[0.04] hover:text-white"
+              >
+                Start Over
+              </button>
+              <Link href="/receipts" className="rounded-[10px] border border-[#4F46E5]/50 px-4 py-2 text-sm text-[#4F46E5] hover:bg-[#4F46E5]/10">
+                View receipts
+              </Link>
             </div>
+          </div>
+        )}
 
-            {/* Post-scan prompts card */}
-            <div className="mt-8 rounded-[12px] border border-emerald-500/30 bg-emerald-500/10 p-6">
-              <div className="flex items-center gap-2 text-emerald-400">
-                <CheckCircle2 className="h-5 w-5 shrink-0" />
-                <p className="font-medium">Receipt saved to My Receipts ✓</p>
-              </div>
-              <p className="mt-1 text-sm text-zinc-400">What would you like to do next?</p>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link
-                  href="/scan"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    resetForNewScan();
-                  }}
-                  className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[12px] border border-white/[0.12] bg-white/[0.06] px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-white/[0.1]"
+        {showStartOverConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-sm rounded-[16px] border border-white/[0.08] bg-[#0f1729] p-6">
+              <p className="text-sm text-white">Clear this scan? It has already been saved to My Receipts.</p>
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowStartOverConfirm(false)}
+                  className="flex-1 rounded-[10px] border border-white/[0.12] py-2.5 text-sm font-medium text-white"
                 >
-                  Scan another receipt
-                </Link>
-                <Link
-                  href="/receipts"
-                  className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[12px] border border-[#4F46E5]/50 bg-[#4F46E5]/20 px-4 py-2.5 text-sm font-medium text-[#4F46E5] transition-all hover:bg-[#4F46E5]/30"
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={resetForNewScan}
+                  className="flex-1 rounded-[10px] bg-[#4F46E5] py-2.5 text-sm font-medium text-white"
                 >
-                  <Receipt className="h-4 w-4" />
-                  View all my receipts
-                </Link>
-                <Link
-                  href="/dashboard"
-                  className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[12px] border border-white/[0.12] bg-white/[0.06] px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-white/[0.1]"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  View my tax summary
-                </Link>
+                  Confirm
+                </button>
               </div>
             </div>
           </div>

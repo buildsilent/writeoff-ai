@@ -6,7 +6,7 @@ export function ExampleScanCard() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-medium text-white">Office supplies</p>
-          <p className="mt-0.5 text-xs text-zinc-500">Office Depot · 2024-03-05</p>
+          <p className="mt-0.5 text-xs text-zinc-500">Office Depot · 2025-03-05</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <p className="text-lg font-semibold text-[#4F46E5]">$127.45</p>
