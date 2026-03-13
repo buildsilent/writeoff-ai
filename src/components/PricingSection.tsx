@@ -25,7 +25,7 @@ export function PricingSection() {
               'Email support',
             ].map((item) => (
               <li key={item} className="flex items-center gap-2 text-sm text-zinc-300">
-                <Check className="h-4 w-4 shrink-0 text-[#FF6B00]" />
+                <Check className="h-4 w-4 shrink-0 text-[#4F46E5]" />
                 {item}
               </li>
             ))}
@@ -48,8 +48,8 @@ export function PricingSection() {
         </div>
 
         {/* Pro Tier */}
-        <div className="relative rounded-xl border-2 border-[#FF6B00] bg-white/[0.02] p-5 md:p-6">
-          <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#FF6B00] px-3 py-0.5 text-xs font-bold text-black">
+        <div className="relative rounded-xl border-2 border-[#4F46E5] bg-white/[0.02] p-5 md:p-6">
+          <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#4F46E5] px-3 py-0.5 text-xs font-bold text-black">
             Most Popular
           </div>
           <h3 className="text-lg font-semibold text-white">Pro</h3>
@@ -65,7 +65,7 @@ export function PricingSection() {
               'Cancel anytime',
             ].map((item) => (
               <li key={item} className="flex items-center gap-2 text-sm text-zinc-300">
-                <Check className="h-4 w-4 shrink-0 text-[#FF6B00]" />
+                <Check className="h-4 w-4 shrink-0 text-[#4F46E5]" />
                 {item}
               </li>
             ))}

@@ -5,7 +5,7 @@ import { UserButton, Show } from '@clerk/nextjs';
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0a0a0a]/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#080B14]/90 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
         <Link
           href="/"
@@ -29,9 +29,9 @@ export function Header() {
             </Link>
             <Link
               href="/sign-up"
-              className="ml-1.5 rounded-lg bg-[#FF6B00] px-3 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-90"
+              className="btn-primary ml-1.5 rounded-lg bg-[#4F46E5] px-3 py-1.5 text-sm font-medium text-white shadow-[0_2px_8px_rgba(79,70,229,0.3)] transition-opacity hover:opacity-95"
             >
-              Get started
+              Start Free
             </Link>
           </Show>
           <Show when="signed-in">
@@ -43,7 +43,7 @@ export function Header() {
             </Link>
             <Link
               href="/scan"
-              className="relative z-10 ml-1.5 cursor-pointer rounded-lg bg-[#FF6B00] px-3 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-90"
+              className="btn-primary relative z-10 ml-1.5 cursor-pointer rounded-lg bg-[#4F46E5] px-3 py-1.5 text-sm font-medium text-white shadow-[0_2px_8px_rgba(79,70,229,0.3)] transition-opacity hover:opacity-95"
             >
               Scan receipt
             </Link>

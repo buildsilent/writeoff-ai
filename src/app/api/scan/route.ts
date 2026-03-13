@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { type, imageBase64, text } = body;
+    const { type, imageBase64, text, followUpAnswer, originalText } = body;
 
     if (!type || (type !== 'image' && type !== 'text')) {
       return NextResponse.json({ error: 'Invalid type. Use "image" or "text"' }, { status: 400 });
@@ -85,15 +85,31 @@ export async function POST(req: NextRequest) {
       result = await analyzeReceiptImage(imageBase64);
       receiptImageUrl = await uploadReceiptImage(supabase, userId, imageBase64);
     } else {
-      if (!text || typeof text !== 'string') {
+      const textInput = followUpAnswer ? originalText : text;
+      if (!textInput || typeof textInput !== 'string') {
         return NextResponse.json({ error: 'text required for text scan' }, { status: 400 });
       }
-      result = await analyzeReceiptText(text);
+      const textToAnalyze = followUpAnswer ? originalText : text;
+      const textResult = await analyzeReceiptText(textToAnalyze, followUpAnswer);
+      if (textResult.followUpQuestion) {
+        return NextResponse.json({
+          followUpQuestion: textResult.followUpQuestion,
+          partialResult: textResult.result,
+        });
+      }
+      result = textResult.result;
+    }
+
+    // Never delete user data. scans and scans_backup are append-only.
+    if (type === 'image' && result.read_successfully === false) {
+      return NextResponse.json(
+        { error: 'RECEIPT_UNREADABLE', message: 'We had trouble reading that receipt.' },
+        { status: 422 }
+      );
     }
 
     const firstItem = result.line_items[0];
-
-    await supabase.from('scans').insert({
+    const scanRow = {
       user_id: userId,
       merchant_name: result.merchant_name,
       amount: result.total_amount,
@@ -103,7 +119,12 @@ export async function POST(req: NextRequest) {
       irs_category: firstItem?.irs_category || null,
       raw_data: result,
       receipt_image_url: receiptImageUrl,
-    });
+    };
+
+    const { data: inserted } = await supabase.from('scans').insert(scanRow).select('id').single();
+    if (inserted) {
+      await supabase.from('scans_backup').insert({ ...scanRow, id: inserted.id });
+    }
 
     return NextResponse.json(result);
   } catch (err) {

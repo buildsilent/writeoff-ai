@@ -23,6 +23,22 @@ create table if not exists scans (
 
 -- Receipt images storage bucket: create via Storage > New bucket > name: receipts, public: true
 
+-- scans_backup: Silent redundancy. Every scan is backed up here. Never delete user data.
+-- Run: CREATE TABLE scans_backup (LIKE scans INCLUDING ALL);
+create table if not exists scans_backup (
+  id uuid primary key default uuid_generate_v4(),
+  user_id text not null,
+  merchant_name text,
+  amount decimal(10, 2) not null,
+  date date,
+  category text,
+  is_deductible boolean default false,
+  irs_category text,
+  raw_data jsonb,
+  receipt_image_url text,
+  created_at timestamptz default now()
+);
+
 -- User subscriptions - tracks Stripe subscription status
 create table if not exists subscriptions (
   id uuid primary key default uuid_generate_v4(),

@@ -39,7 +39,7 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6">
-      <div className="w-full max-w-sm rounded-xl border border-white/[0.06] bg-[#0a0a0a] p-6">
+      <div className="w-full max-w-sm rounded-xl border border-white/[0.06] bg-[#080B14] p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Upgrade to Pro</h2>
           <button
@@ -80,7 +80,7 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
             onClick={handleUpgrade}
             type="button"
             disabled={loading}
-            className="btn-primary flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#FF6B00] py-2.5 text-sm font-medium text-black disabled:opacity-50"
+            className="btn-primary flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#4F46E5] py-2.5 text-sm font-medium text-white disabled:opacity-50"
           >
             {loading ? (
               <>

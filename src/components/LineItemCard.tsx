@@ -49,9 +49,9 @@ export function LineItemCard({ item, merchantName, date, receiptImageUrl, onRece
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <p className="text-lg font-semibold text-[#FF6B00]">${item.amount.toFixed(2)}</p>
+          <p className="text-lg font-semibold text-[#4F46E5]">${item.amount.toFixed(2)}</p>
           {item.is_deductible ? (
-            <span className="flex items-center gap-1 rounded-full bg-[#FF6B00]/10 px-2 py-0.5 text-xs font-medium text-[#FF6B00]">
+            <span className="flex items-center gap-1 rounded-full bg-[#4F46E5]/20 px-2 py-0.5 text-xs font-medium text-[#4F46E5]">
               <Check className="h-3 w-3" />
               {item.deduction_percent}%
             </span>

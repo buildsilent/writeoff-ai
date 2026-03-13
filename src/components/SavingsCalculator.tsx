@@ -23,7 +23,7 @@ export function SavingsCalculator() {
   return (
     <section className="mx-auto max-w-2xl">
       <div className="flex items-center gap-2 mb-4">
-        <Calculator className="h-5 w-5 text-[#FF6B00]" />
+        <Calculator className="h-5 w-5 text-[#4F46E5]" />
         <h2 className="text-xl font-semibold text-white">How much could you save?</h2>
       </div>
       <p className="text-sm text-zinc-500 mb-6">
@@ -36,10 +36,10 @@ export function SavingsCalculator() {
             <select
               value={jobType}
               onChange={(e) => setJobType(e.target.value)}
-              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-white focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
             >
               {JOB_TYPES.map((j) => (
-                <option key={j.id} value={j.id} className="bg-[#1a1a1a] text-white">
+                <option key={j.id} value={j.id} className="bg-[#080B14] text-white">
                   {j.label}
                 </option>
               ))}
@@ -55,14 +55,14 @@ export function SavingsCalculator() {
                 step="50"
                 value={monthlySpend}
                 onChange={(e) => setMonthlySpend(e.target.value)}
-                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3 pl-8 pr-4 text-white focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3 pl-8 pr-4 text-white focus:border-[#4F46E5] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
               />
             </div>
           </div>
         </div>
-        <div className="mt-6 rounded-xl border border-[#FF6B00]/30 bg-[#FF6B00]/5 p-4">
+        <div className="mt-6 rounded-xl border border-[#4F46E5]/30 bg-[#4F46E5]/5 p-4">
           <p className="text-sm text-zinc-500">Estimated annual tax savings</p>
-          <p className="mt-1.5 text-3xl font-bold text-[#FF6B00]">${estimatedSavings.toLocaleString()}</p>
+          <p className="mt-1.5 text-3xl font-bold text-[#4F46E5]">${estimatedSavings.toLocaleString()}</p>
           <p className="mt-2 text-xs text-zinc-500">
             Based on ~{Math.round(rate * 100)}% effective tax rate for your work type. Actual savings depend on your receipts and tax situation.
           </p>

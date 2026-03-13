@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0a;
+  --background: #080B14;
   --foreground: #ffffff;
-  --accent: #FF6B00;
+  --accent: #4F46E5;
 }
 
 @theme inline {
@@ -19,10 +19,19 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* Subtle button hover - Linear/Vercel style */
+/* Premium fintech button - tactile with shadow and hover */
 .btn-primary {
-  transition: opacity 0.2s ease;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 .btn-primary:hover:not(:disabled) {
-  opacity: 0.9;
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+@keyframes gradient-shift {
+  0%, 100% { opacity: 0.5; transform: scale(1) translate(0, 0); }
+  33% { opacity: 0.7; transform: scale(1.05) translate(2%, 1%); }
+  66% { opacity: 0.6; transform: scale(0.98) translate(-1%, 2%); }
 }

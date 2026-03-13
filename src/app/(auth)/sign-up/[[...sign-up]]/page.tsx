@@ -11,14 +11,14 @@ export default async function SignUpPage({
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0a0a0a] p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#080B14] p-6">
       <SignUp
         fallbackRedirectUrl={goPro ? `${appUrl}/go-pro` : `${appUrl}/dashboard`}
         appearance={{
           variables: {
-            colorPrimary: "#FF6B00",
+            colorPrimary: "#4F46E5",
             colorBackground: "#ffffff",
-            colorText: "#0a0a0a",
+            colorText: "#080B14",
             colorInputBackground: "#f8faf8",
             borderRadius: "0.75rem",
           },
@@ -28,7 +28,7 @@ export default async function SignUpPage({
         Want to pay immediately?{" "}
         <Link
           href="/sign-up?goPro=1"
-          className="text-[#FF6B00] underline hover:no-underline"
+          className="text-[#4F46E5] underline hover:no-underline"
         >
           Skip to Pro
         </Link>

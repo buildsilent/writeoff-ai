@@ -9,8 +9,8 @@ export function ExampleScanCard() {
           <p className="mt-0.5 text-xs text-zinc-500">Office Depot · 2024-03-05</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <p className="text-lg font-semibold text-[#FF6B00]">$127.45</p>
-          <span className="flex items-center gap-1 rounded-full bg-[#FF6B00]/10 px-2 py-0.5 text-xs font-medium text-[#FF6B00]">
+          <p className="text-lg font-semibold text-[#4F46E5]">$127.45</p>
+          <span className="flex items-center gap-1 rounded-full bg-[#4F46E5]/10 px-2 py-0.5 text-xs font-medium text-[#4F46E5]">
             <Check className="h-3 w-3" />
             100%
           </span>
@@ -20,7 +20,7 @@ export function ExampleScanCard() {
         <span className="rounded-md bg-white/[0.04] px-2 py-1 text-xs text-white">
           📦 Office Supplies
         </span>
-        <span className="text-xs font-medium text-[#FF6B00]">High confidence</span>
+        <span className="text-xs font-medium text-[#4F46E5]">High confidence</span>
       </div>
     </div>
   );

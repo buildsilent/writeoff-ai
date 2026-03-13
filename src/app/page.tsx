@@ -10,25 +10,54 @@ import { Upload } from 'lucide-react';
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-[#080B14]">
+      {/* Notification bar at very top */}
+      <div className="flex items-center justify-center gap-2 border-b border-white/[0.06] bg-[#080B14] px-4 py-2.5 text-center text-sm text-zinc-300">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400" />
+        </span>
+        Tax season is here — find your missed deductions in 30 seconds
+      </div>
       <Header />
       <main className="mx-auto max-w-5xl px-4 pb-14 sm:px-6">
-        {/* Hero */}
-        <section className="pt-12 pb-10 text-center md:pt-16 md:pb-12">
+        {/* Hero - gradient mesh background */}
+        <section className="relative overflow-hidden pt-12 pb-10 text-center md:pt-16 md:pb-12">
+          <div className="pointer-events-none absolute inset-0 -z-10">
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,#080B14_0%,#0f1729_30%,#1e1b4b_70%,#312e81_100%)] opacity-90" />
+            <div
+              className="absolute inset-0 animate-[gradient-shift_15s_ease-in-out_infinite] opacity-60"
+              style={{
+                background:
+                  'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(79,70,229,0.4), transparent), radial-gradient(ellipse 60% 40% at 80% 50%, rgba(124,58,237,0.2), transparent), radial-gradient(ellipse 50% 30% at 20% 80%, rgba(79,70,229,0.2), transparent)',
+              }}
+            />
+            <div
+              className="absolute inset-0 opacity-[0.03]"
+              style={{
+                backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+                backgroundSize: '48px 48px',
+              }}
+            />
+          </div>
           <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
             TaxSnapper finds
             <br />
-            <span className="text-[#FF6B00]">every deduction</span>
+            <span className="text-[#4F46E5]">every deduction</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-zinc-400 md:text-lg">
             The AI-powered receipt scanner that finds, categorizes, and tracks every business expense.
             Upload a photo or paste receipt text—get exact IRS categories in seconds.
           </p>
+          <p className="mt-4 text-sm text-zinc-500">
+            <span className="font-medium text-white">1,247</span> deductions found so far
+          </p>
           <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Show when="signed-in">
               <Link
                 href="/scan"
-                className="btn-primary flex w-full items-center justify-center gap-2 rounded-xl bg-[#FF6B00] py-3 text-base font-bold text-black shadow-[0_0_24px_rgba(255,107,0,0.35)] sm:w-auto sm:min-w-[220px] sm:px-6"
+                className="btn-primary flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] py-3 text-base font-bold text-white shadow-[0_4px_14px_rgba(79,70,229,0.4)] sm:w-auto sm:min-w-[220px] sm:px-6"
               >
                 <Upload className="h-5 w-5" />
                 Scan receipt
@@ -37,7 +66,7 @@ export default function LandingPage() {
             <Show when="signed-out">
               <Link
                 href="/sign-up"
-                className="btn-primary flex w-full items-center justify-center gap-2 rounded-xl bg-[#FF6B00] py-3 text-base font-bold text-black shadow-[0_0_24px_rgba(255,107,0,0.35)] sm:w-auto sm:min-w-[220px] sm:px-6"
+                className="btn-primary flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] py-3 text-base font-bold text-white shadow-[0_4px_14px_rgba(79,70,229,0.4)] sm:w-auto sm:min-w-[220px] sm:px-6"
               >
                 Get started free
               </Link>
@@ -68,7 +97,7 @@ export default function LandingPage() {
           <div className="mt-6 text-center">
             <Link
               href="/sign-up"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B00] px-6 py-3 font-bold text-black"
+              className="btn-primary inline-flex items-center gap-2 rounded-xl bg-[#4F46E5] px-6 py-3 font-bold text-white shadow-[0_4px_14px_rgba(79,70,229,0.4)]"
             >
               Get started free
             </Link>
@@ -90,7 +119,7 @@ export default function LandingPage() {
                   <th className="px-4 py-2.5 font-medium text-white">Feature</th>
                   <th className="px-4 py-2.5 font-medium text-zinc-500">TurboTax</th>
                   <th className="px-4 py-2.5 font-medium text-zinc-500">Keeper Tax</th>
-                  <th className="px-4 py-2.5 font-medium text-[#FF6B00]">TaxSnapper</th>
+                  <th className="px-4 py-2.5 font-medium text-[#4F46E5]">TaxSnapper</th>
                 </tr>
               </thead>
               <tbody>
@@ -98,25 +127,25 @@ export default function LandingPage() {
                   <td className="px-4 py-2.5 text-white">Receipt Scanning</td>
                   <td className="px-4 py-2.5 text-zinc-500">Manual entry</td>
                   <td className="px-4 py-2.5 text-zinc-500">Manual review</td>
-                  <td className="px-4 py-2.5 text-[#FF6B00]">AI auto-categorizes in seconds</td>
+                  <td className="px-4 py-2.5 text-[#4F46E5]">AI auto-categorizes in seconds</td>
                 </tr>
                 <tr className="border-b border-white/[0.06]">
                   <td className="px-4 py-2.5 text-white">IRS Categories</td>
                   <td className="px-4 py-2.5 text-zinc-500">You pick</td>
                   <td className="px-4 py-2.5 text-zinc-500">SMS with bookkeeper</td>
-                  <td className="px-4 py-2.5 text-[#FF6B00]">Exact Schedule C categories</td>
+                  <td className="px-4 py-2.5 text-[#4F46E5]">Exact Schedule C categories</td>
                 </tr>
                 <tr className="border-b border-white/[0.06]">
                   <td className="px-4 py-2.5 text-white">Deduction %</td>
                   <td className="px-4 py-2.5 text-zinc-500">You calculate</td>
                   <td className="px-4 py-2.5 text-zinc-500">Bookkeeper suggests</td>
-                  <td className="px-4 py-2.5 text-[#FF6B00]">100% or 50% per item</td>
+                  <td className="px-4 py-2.5 text-[#4F46E5]">100% or 50% per item</td>
                 </tr>
                 <tr>
                   <td className="px-4 py-2.5 text-white">Export</td>
                   <td className="px-4 py-2.5 text-zinc-500">Built into filing</td>
                   <td className="px-4 py-2.5 text-zinc-500">Add-on</td>
-                  <td className="px-4 py-2.5 text-[#FF6B00]">CSV export included</td>
+                  <td className="px-4 py-2.5 text-[#4F46E5]">CSV export included</td>
                 </tr>
               </tbody>
             </table>
@@ -178,7 +207,7 @@ export default function LandingPage() {
           <Show when="signed-out">
             <Link
               href="/sign-up"
-              className="btn-primary mt-6 inline-flex rounded-xl bg-[#FF6B00] px-8 py-3 text-base font-bold text-black shadow-[0_0_24px_rgba(255,107,0,0.35)]"
+              className="btn-primary mt-6 inline-flex rounded-xl bg-[#4F46E5] px-8 py-3 text-base font-bold text-white shadow-[0_4px_14px_rgba(79,70,229,0.4)]"
             >
               Start free
             </Link>
@@ -186,7 +215,7 @@ export default function LandingPage() {
           <Show when="signed-in">
             <Link
               href="/scan"
-              className="btn-primary mt-6 inline-flex rounded-xl bg-[#FF6B00] px-8 py-3 text-base font-bold text-black shadow-[0_0_24px_rgba(255,107,0,0.35)]"
+              className="btn-primary mt-6 inline-flex rounded-xl bg-[#4F46E5] px-8 py-3 text-base font-bold text-white shadow-[0_4px_14px_rgba(79,70,229,0.4)]"
             >
               Scan receipt
             </Link>
