@@ -64,6 +64,18 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
+          <div
+            style={{
+              background: '#1a1a1a',
+              color: 'white',
+              fontSize: 12,
+              textAlign: 'center',
+              padding: 8,
+              width: '100%',
+            }}
+          >
+            TaxSnapper is currently in beta — results are estimates, always verify with a CPA.
+          </div>
           <StructuredData />
           {children}
           <UpgradeBanner />
