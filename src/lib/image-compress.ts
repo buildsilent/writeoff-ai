@@ -42,6 +42,20 @@ function enhanceReceiptImage(ctx: CanvasRenderingContext2D, w: number, h: number
   ctx.putImageData(imageData, 0, 0);
 }
 
+/**
+ * Prepare any receipt format (image or PDF) for scan API.
+ * Images are compressed and enhanced. PDF first page is converted to JPEG.
+ */
+export async function prepareReceiptForUpload(file: File): Promise<string> {
+  if (file.type === 'application/pdf') {
+    const { pdfFirstPageToImageBlob } = await import('@/lib/pdf-to-image');
+    const blob = await pdfFirstPageToImageBlob(file);
+    const imageFile = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
+    return compressImageForUpload(imageFile);
+  }
+  return compressImageForUpload(file);
+}
+
 export async function compressImageForUpload(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();

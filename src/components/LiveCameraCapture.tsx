@@ -34,7 +34,7 @@ export function LiveCameraCapture({ onCapture, onClose, onError }: LiveCameraCap
           return;
         }
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
           audio: false,
         });
         if (cancelled) {
@@ -42,8 +42,14 @@ export function LiveCameraCapture({ onCapture, onClose, onError }: LiveCameraCap
           return;
         }
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          try {
+            await video.play();
+          } catch {
+            // Autoplay may be blocked; playsInline + muted usually works on iOS
+          }
         }
         setStatus('ready');
       } catch (err) {
@@ -110,11 +116,19 @@ export function LiveCameraCapture({ onCapture, onClose, onError }: LiveCameraCap
     (async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
           audio: false,
         });
         streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          try {
+            await video.play();
+          } catch {
+            // Ignore autoplay failure
+          }
+        }
         setStatus('ready');
       } catch {
         setStatus('error');
@@ -190,6 +204,7 @@ export function LiveCameraCapture({ onCapture, onClose, onError }: LiveCameraCap
               playsInline
               muted
               className="h-full w-full object-cover"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
             <div
               className="pointer-events-none absolute rounded-2xl border-2 border-white/60 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"

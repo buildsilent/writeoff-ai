@@ -9,13 +9,14 @@ import { ScanResults } from '@/components/ScanResults';
 import { ScanCelebrationModal, getDeductionStatsFromResult } from '@/components/ScanCelebrationModal';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ScanSkeleton } from '@/components/Skeleton';
-import { Camera, FileText, Loader2, RotateCcw } from 'lucide-react';
+import { Camera, FileText, Loader2, RotateCcw, Upload } from 'lucide-react';
 import { notifyScanComplete } from '@/hooks/useScansRealtime';
 import { useScanWorker } from '@/hooks/useScanWorker';
-import { compressImageForUpload } from '@/lib/image-compress';
+import { prepareReceiptForUpload } from '@/lib/image-compress';
 import { LiveCameraCapture } from '@/components/LiveCameraCapture';
 
 const FILE_INPUT_ID = 'receipt-file-input';
+const ACCEPT_FILES = 'image/*,application/pdf';
 const PROGRESS_MESSAGES = [
   'Reading your receipt...',
   'Identifying line items...',
@@ -112,25 +113,42 @@ function ScanContent() {
     setPendingText('');
   }, [previewUrl]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const f = input.files?.[0];
-    if (f && f.type.startsWith('image/')) {
-      setFile(f);
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+  const setFileFromInput = useCallback(async (f: File) => {
+    const isImage = f.type.startsWith('image/');
+    const isPdf = f.type === 'application/pdf';
+    if (!isImage && !isPdf) return false;
+    setFile(f);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (isImage) {
       setPreviewUrl(URL.createObjectURL(f));
-      setError(null);
-      setResult(null);
-      setFailedAttempts(0);
-      setFollowUpQuestion(null);
-      setPendingText('');
-    } else if (f) {
+    } else {
+      try {
+        const { pdfFirstPageToImageBlob } = await import('@/lib/pdf-to-image');
+        const blob = await pdfFirstPageToImageBlob(f);
+        setPreviewUrl(URL.createObjectURL(blob));
+      } catch {
+        setPreviewUrl(null);
+      }
+    }
+    setError(null);
+    setResult(null);
+    setFailedAttempts(0);
+    setFollowUpQuestion(null);
+    setPendingText('');
+    return true;
+  }, [previewUrl]);
+
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const ok = await setFileFromInput(f);
+    if (!ok) {
       setFile(null);
       setPreviewUrl(null);
-      setError('Please select an image file (JPEG, PNG, or WebP)');
+      setError('Please select an image (JPEG, PNG, WebP) or PDF file');
     }
-    input.value = '';
-  };
+    e.target.value = '';
+  }, [setFileFromInput]);
 
   const handleCameraCapture = useCallback((blob: Blob) => {
     setShowLiveCamera(false);
@@ -144,8 +162,7 @@ function ScanContent() {
     setResult(null);
     setError(null);
     setFailedAttempts(0);
-    if (isMobile) setShowLiveCamera(true);
-    else fileInputRef.current?.click();
+    setShowLiveCamera(false);
   };
 
   const handleSubmit = useCallback(async () => {
@@ -177,7 +194,7 @@ function ScanContent() {
     const base = { categoryHint: hintVal, clientLocalDate };
     const body: Record<string, unknown> =
       mode === 'upload'
-        ? { ...base, type: 'image', imageBase64: await compressImageForUpload(file!) }
+        ? { ...base, type: 'image', imageBase64: await prepareReceiptForUpload(file!) }
         : followUpQuestion
           ? { ...base, type: 'text', originalText: pendingText, followUpAnswer: text.trim() }
           : { ...base, type: 'text', text: originalTextForRequest };
@@ -338,27 +355,33 @@ function ScanContent() {
           </div>
         )}
 
-        {/* Two big cards - side by side, same height. Only when no result and not loading */}
+        {/* Three input methods - only when no result and not loading */}
         {!result && !loading && (
-          <div className="mt-8 grid gap-6 sm:grid-cols-2">
-            {/* Photo Scan card */}
+          <div className="mt-8 grid gap-6 sm:grid-cols-3">
+            {/* 1. Live Camera (or preview when file set) */}
             <div
-              className={`flex min-h-[320px] flex-col rounded-[12px] border-2 border-dashed transition-all ${
+              className={`flex min-h-[280px] flex-col rounded-[12px] border-2 border-dashed transition-all ${
                 file
-                  ? 'border-[#4F46E5] bg-[#4F46E5]/5'
+                  ? 'sm:col-span-2 border-[#4F46E5] bg-[#4F46E5]/5'
                   : 'border-white/[0.12] bg-white/[0.02] hover:border-[#4F46E5]/50 hover:bg-white/[0.04]'
               }`}
             >
               {file ? (
                 <div className="flex flex-1 flex-col p-6">
                   <div className="overflow-hidden rounded-[12px] border border-white/[0.08]">
-                    <img src={previewUrl!} alt="Receipt preview" className="w-full object-contain" />
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="Receipt preview" className="w-full object-contain" />
+                    ) : (
+                      <div className="flex aspect-[3/4] items-center justify-center bg-white/[0.04]">
+                        <FileText className="h-12 w-12 text-zinc-500" />
+                      </div>
+                    )}
                   </div>
                   <div className="mt-4 flex gap-3">
                     <button
                       onClick={handleSubmit}
                       type="button"
-                      className="btn-primary flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-[12px] bg-[#4F46E5] py-2.5 font-semibold text-white shadow-[0_4px_14px_rgba(79,70,229,0.4)] transition-all hover:shadow-[0_4px_20px_rgba(79,70,229,0.5)]"
+                      className="btn-primary flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-[12px] bg-[#4F46E5] py-2.5 font-semibold text-white"
                     >
                       Looks good — Analyze
                     </button>
@@ -374,53 +397,65 @@ function ScanContent() {
                 </div>
               ) : (
                 <>
+                  <button
+                    type="button"
+                    onClick={() => setShowLiveCamera(true)}
+                    className="group flex min-h-[280px] w-full cursor-pointer flex-col items-center justify-center rounded-[12px] p-6 transition-colors"
+                  >
+                    <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-6 transition-colors group-hover:border-[#4F46E5]/30">
+                      <Camera className="h-14 w-14 text-[#4F46E5]" />
+                    </div>
+                    <p className="mt-4 text-base font-semibold text-white">Live Camera</p>
+                    <p className="mt-1 text-xs text-zinc-500">Tap to open camera</p>
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* 2. Upload File */}
+            <div
+              className={`flex min-h-[280px] flex-col rounded-[12px] border-2 border-dashed transition-all ${
+                file ? 'hidden' : 'border-white/[0.12] bg-white/[0.02] hover:border-[#4F46E5]/50 hover:bg-white/[0.04]'
+              }`}
+            >
+              {!file && (
+                <>
                   <input
                     ref={fileInputRef}
                     id={FILE_INPUT_ID}
                     type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    capture={isMobile ? undefined : 'environment'}
+                    accept={ACCEPT_FILES}
                     onChange={handleFileChange}
                     className="absolute h-0 w-0 opacity-0"
-                    aria-label="Select or take a photo of your receipt"
+                    aria-label="Upload receipt image or PDF"
                   />
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && (isMobile ? setShowLiveCamera(true) : fileInputRef.current?.click())}
-                    onClick={() => {
-                      if (isMobile) setShowLiveCamera(true);
-                      else fileInputRef.current?.click();
-                    }}
+                  <label
+                    htmlFor={FILE_INPUT_ID}
                     onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                     onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
                     onDrop={(e) => {
                       e.preventDefault();
                       setIsDragging(false);
                       const f = e.dataTransfer?.files?.[0];
-                      if (f?.type.startsWith('image/')) {
-                        setFile(f);
-                        if (previewUrl) URL.revokeObjectURL(previewUrl);
-                        setPreviewUrl(URL.createObjectURL(f));
-                        setError(null);
-                        setResult(null);
-                      } else if (f) setError('Please drop an image file (JPEG, PNG, or WebP)');
+                      if (f && (f.type.startsWith('image/') || f.type === 'application/pdf')) {
+                        setFileFromInput(f);
+                      } else if (f) setError('Please drop an image or PDF file');
                     }}
-                    className={`group flex min-h-[320px] cursor-pointer flex-col items-center justify-center rounded-[12px] border-2 border-dashed p-6 transition-colors ${
-                      isDragging ? 'border-[#4F46E5] bg-[#4F46E5]/10' : 'border-white/[0.12] hover:border-[#4F46E5]/50'
+                    className={`group flex min-h-[280px] cursor-pointer flex-col items-center justify-center rounded-[12px] p-6 transition-colors ${
+                      isDragging ? 'border-[#4F46E5] bg-[#4F46E5]/10' : ''
                     }`}
                   >
-                    <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-8 transition-colors group-hover:border-[#4F46E5]/30">
-                      <Camera className="h-20 w-20 text-[#4F46E5]" />
+                    <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-6 transition-colors group-hover:border-[#4F46E5]/30">
+                      <Upload className="h-14 w-14 text-[#4F46E5]" />
                     </div>
-                    <p className="mt-6 text-base font-semibold text-white">Photo Scan</p>
-                    {!isMobile && <p className="mt-1 text-xs text-zinc-500">Click or drag & drop</p>}
-                  </div>
+                    <p className="mt-4 text-base font-semibold text-white">Upload File</p>
+                    <p className="mt-1 text-xs text-zinc-500">Image or PDF</p>
+                  </label>
                 </>
               )}
             </div>
 
-            {/* Type It Out card */}
+            {/* 3. Type It Out card */}
             <div className="flex min-h-[320px] flex-col rounded-[12px] border-2 border-dashed border-white/[0.12] bg-white/[0.02] p-6 transition-all hover:border-[#4F46E5]/50">
               <div className="flex items-center gap-2">
                 <FileText className="h-8 w-8 text-[#4F46E5]" />
