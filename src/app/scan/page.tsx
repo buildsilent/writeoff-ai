@@ -13,8 +13,8 @@ import { Camera, FileText, Loader2, RotateCcw, Upload } from 'lucide-react';
 import { notifyScanComplete } from '@/hooks/useScansRealtime';
 import { useScanWorker } from '@/hooks/useScanWorker';
 import { prepareReceiptForUpload } from '@/lib/image-compress';
-import { LiveCameraCapture } from '@/components/LiveCameraCapture';
 
+const PHOTO_INPUT_ID = 'receipt-photo-input';
 const FILE_INPUT_ID = 'receipt-file-input';
 const ACCEPT_FILES = 'image/*,application/pdf';
 const PROGRESS_MESSAGES = [
@@ -62,20 +62,11 @@ function ScanContent() {
   const [pendingText, setPendingText] = useState<string>('');
   const [categoryHint, setCategoryHint] = useState<string>('');
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
-  const [showLiveCamera, setShowLiveCamera] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { ready: workerReady, runScan, requestNotificationPermission } = useScanWorker();
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
 
   useEffect(() => {
     if (canceledParam === '1') setCheckoutCanceled(true);
@@ -100,18 +91,6 @@ function ScanContent() {
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
   }, []);
-
-  const setFileFromBlob = useCallback((blob: Blob) => {
-    const f = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
-    setFile(f);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(URL.createObjectURL(f));
-    setError(null);
-    setResult(null);
-    setFailedAttempts(0);
-    setFollowUpQuestion(null);
-    setPendingText('');
-  }, [previewUrl]);
 
   const setFileFromInput = useCallback(async (f: File) => {
     const isImage = f.type.startsWith('image/');
@@ -150,11 +129,6 @@ function ScanContent() {
     e.target.value = '';
   }, [setFileFromInput]);
 
-  const handleCameraCapture = useCallback((blob: Blob) => {
-    setShowLiveCamera(false);
-    setFileFromBlob(blob);
-  }, [setFileFromBlob]);
-
   const handleRetake = () => {
     setFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -162,7 +136,6 @@ function ScanContent() {
     setResult(null);
     setError(null);
     setFailedAttempts(0);
-    setShowLiveCamera(false);
   };
 
   const handleSubmit = useCallback(async () => {
@@ -358,7 +331,7 @@ function ScanContent() {
         {/* Three input methods - only when no result and not loading */}
         {!result && !loading && (
           <div className="mt-8 grid gap-6 sm:grid-cols-3">
-            {/* 1. Live Camera (or preview when file set) */}
+            {/* 1. Photo (native camera or picker) */}
             <div
               className={`flex min-h-[280px] flex-col rounded-[12px] border-2 border-dashed transition-all ${
                 file
@@ -397,17 +370,25 @@ function ScanContent() {
                 </div>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setShowLiveCamera(true)}
+                  <input
+                    id={PHOTO_INPUT_ID}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileChange}
+                    className="absolute h-0 w-0 opacity-0"
+                    aria-label="Take photo or choose from library"
+                  />
+                  <label
+                    htmlFor={PHOTO_INPUT_ID}
                     className="group flex min-h-[280px] w-full cursor-pointer flex-col items-center justify-center rounded-[12px] p-6 transition-colors"
                   >
                     <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-6 transition-colors group-hover:border-[#4F46E5]/30">
                       <Camera className="h-14 w-14 text-[#4F46E5]" />
                     </div>
-                    <p className="mt-4 text-base font-semibold text-white">Live Camera</p>
-                    <p className="mt-1 text-xs text-zinc-500">Tap to open camera</p>
-                  </button>
+                    <p className="mt-4 text-base font-semibold text-white">Photo</p>
+                    <p className="mt-1 text-xs text-zinc-500">Camera or library</p>
+                  </label>
                 </>
               )}
             </div>
@@ -630,12 +611,6 @@ function ScanContent() {
 
       <AppFooter />
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
-      {showLiveCamera && (
-        <LiveCameraCapture
-          onCapture={handleCameraCapture}
-          onClose={() => setShowLiveCamera(false)}
-        />
-      )}
     </div>
   );
 }
