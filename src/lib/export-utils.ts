@@ -94,7 +94,10 @@ export function scansToExportRows(scans: ExportScan[]): ExportLineItem[] {
       for (const li of raw.line_items) {
         const amt = li.amount ?? 0;
         const pct = li.deduction_percent ?? 0;
-        const deductible = li.is_deductible ? amt * (pct / 100) : 0;
+        const liWithDed = li as { deductible_amount_cents?: number };
+        const deductible = typeof liWithDed.deductible_amount_cents === 'number'
+          ? liWithDed.deductible_amount_cents
+          : (li.is_deductible ? Math.round(amt * ((pct >= 75 ? 100 : pct >= 25 ? 50 : 0) / 100)) : 0);
         rows.push({
           date,
           merchant,

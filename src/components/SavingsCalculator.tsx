@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Calculator } from 'lucide-react';
+import { formatCents } from '@/lib/format';
 
 const JOB_TYPES = [
   { id: 'freelancer', label: 'Freelancer', rate: 0.25 },
@@ -18,7 +19,7 @@ export function SavingsCalculator() {
   const rate = JOB_TYPES.find((j) => j.id === jobType)?.rate ?? 0.25;
   const spend = parseFloat(monthlySpend) || 0;
   const annualSpend = spend * 12;
-  const estimatedSavings = Math.round(annualSpend * rate);
+  const estimatedSavingsCents = Math.round(annualSpend * rate * 100);
 
   return (
     <section className="mx-auto max-w-2xl">
@@ -62,12 +63,12 @@ export function SavingsCalculator() {
         </div>
         <div className="mt-6 rounded-[12px] border border-[#4F46E5]/30 bg-[#4F46E5]/5 p-4">
           <p className="text-sm text-zinc-500">Estimated annual tax savings</p>
-          <p className="mt-1.5 text-3xl font-bold text-[#4F46E5]">${estimatedSavings.toLocaleString()}</p>
+          <p className="mt-1.5 text-3xl font-bold text-[#4F46E5]">{formatCents(estimatedSavingsCents)}</p>
           <p className="mt-2 text-xs text-zinc-500">
             Based on ~{Math.round(rate * 100)}% effective tax rate for your work type. Actual savings depend on your receipts and tax situation.
           </p>
           <p className="mt-3 text-xs text-zinc-400">
-            💡 That&apos;s ${Math.round(estimatedSavings / 12).toLocaleString()}/month back in your pocket. Scan your receipts with TaxSnapper to capture every deduction.
+            💡 That&apos;s {formatCents(Math.round(estimatedSavingsCents / 12))}/month back in your pocket. Scan your receipts with TaxSnapper to capture every deduction.
           </p>
         </div>
       </div>

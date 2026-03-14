@@ -143,17 +143,21 @@ export async function POST(req: NextRequest) {
     const sumFromLineItems = Math.round(lineItems.reduce((s, li) => s + Number(li.amount ?? 0), 0));
     const amountCents = totalFromAI > 0 ? totalFromAI : sumFromLineItems;
 
-    // Server-side: recalc deductible_amount_cents for each line item (never trust AI math)
+    // Server-side: NEVER trust AI math — recalc for every line item
+    // deductible_amount_cents = Math.round(amount_cents × deduction_percent / 100)
+    // tax_savings_cents = Math.round(deductible_amount_cents × 25 / 100)
     const lineItemsWithRecalc = lineItems.map((li) => {
       const amtCents = Math.round(Number(li.amount ?? 0));
       const pct = Number(li.deduction_percent ?? 0);
       const safePct = pct >= 75 ? 100 : pct >= 25 ? 50 : 0;
       const deductibleCents = Math.round(amtCents * safePct / 100);
+      const taxSavingsCents = Math.round(deductibleCents * 25 / 100);
       return {
         ...li,
         amount: amtCents,
         deduction_percent: safePct,
         deductible_amount_cents: deductibleCents,
+        tax_savings_cents: taxSavingsCents,
       };
     });
 
@@ -264,13 +268,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const raw = savedScan.raw_data as { line_items?: unknown[]; merchant_name?: string; date?: string } | null;
+    const raw = savedScan.raw_data as { line_items?: Array<{ amount?: number; deduction_percent?: number; is_deductible?: boolean; deductible_amount_cents?: number }>; merchant_name?: string; date?: string } | null;
+    const items = raw?.line_items ?? [];
+    const receiptTotalCents = Number(savedScan.amount);
+    const deductibleAmountCents = items.reduce((s, li) => {
+      if (typeof li.deductible_amount_cents === 'number') return s + li.deductible_amount_cents;
+      if (!li.is_deductible) return s;
+      const amt = Math.round(Number(li.amount ?? 0));
+      const pct = li.deduction_percent ?? 100;
+      const safePct = pct >= 75 ? 100 : pct >= 25 ? 50 : 0;
+      return s + Math.round(amt * safePct / 100);
+    }, 0);
+    const taxSavingsCents = Math.round(deductibleAmountCents * 25 / 100);
+
     return NextResponse.json({
       id: savedScan.id,
       merchant_name: savedScan.merchant_name ?? raw?.merchant_name,
       date: savedScan.date ?? raw?.date ?? null,
-      total_amount: Number(savedScan.amount),
-      line_items: raw?.line_items ?? [],
+      line_items: items,
+      receipt_total_cents: receiptTotalCents,
+      deductible_amount_cents: deductibleAmountCents,
+      tax_savings_cents: taxSavingsCents,
     });
   } catch (err) {
     console.error('Scan error:', err);

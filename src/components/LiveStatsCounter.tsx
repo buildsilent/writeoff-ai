@@ -1,13 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-function formatDollars(cents: number): string {
-  const n = cents / 100;
-  if (n >= 1000000) return `$${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000) return `$${(n / 1000).toFixed(0)}K`;
-  return `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-}
+import { formatCents } from '@/lib/format';
 
 export function LiveStatsCounter() {
   const [totalCents, setTotalCents] = useState<number | null>(null);
@@ -38,7 +32,7 @@ export function LiveStatsCounter() {
   return (
     <p className="mt-4 text-sm text-zinc-500">
       <span className="font-medium text-white">
-        TaxSnapper users have found {formatDollars(totalCents)} in deductions
+        TaxSnapper users have found {formatCents(totalCents)} in deductions
       </span>
     </p>
   );

@@ -10,7 +10,7 @@ import { Camera, Download, Lock } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
 import { getCategoryEmoji } from '@/lib/constants';
 import { formatCents } from '@/lib/format';
-import { getDeductibleAmountCents, getTaxSavingsCents } from '@/lib/deductions';
+import { computeScanTotals } from '@/lib/deductions';
 import { computeTaxHealthScore, type ScanForInsights } from '@/lib/tax-insights';
 import { EmailDigestBanner } from '@/components/EmailDigestBanner';
 import { ExportModal } from '@/components/ExportModal';
@@ -126,20 +126,22 @@ function DashboardContent() {
       const items = raw?.line_items;
       if (items) {
         for (const li of items) {
-          if (li.is_deductible) {
-            const amt = Math.round((li.amount ?? 0) * ((li.deduction_percent ?? 100) / 100));
+          const d = computeScanTotals({ amount: 0, raw_data: { line_items: [li] } }).deductibleAmountCents;
+          if (d > 0) {
             const cat = li.irs_category || 'Other';
-            catTotals.set(cat, (catTotals.get(cat) || 0) + amt);
+            catTotals.set(cat, (catTotals.get(cat) || 0) + d);
           }
         }
-      } else if ((s.raw_data as { is_deductible?: boolean })?.is_deductible) {
-        const scanDed = getDeductibleAmountCents(s as Parameters<typeof getDeductibleAmountCents>[0], true);
-        const cat = (s.raw_data as { irs_category?: string })?.irs_category || 'Other';
-        catTotals.set(cat, (catTotals.get(cat) || 0) + scanDed);
+      } else {
+        const t = computeScanTotals(s);
+        if (t.deductibleAmountCents > 0) {
+          const cat = (s.raw_data as { irs_category?: string })?.irs_category || 'Other';
+          catTotals.set(cat, (catTotals.get(cat) || 0) + t.deductibleAmountCents);
+        }
       }
     }
 
-    const totalDed = yearScans.reduce((sum, s) => sum + getDeductibleAmountCents(s as Parameters<typeof getDeductibleAmountCents>[0], true), 0);
+    const totalDed = yearScans.reduce((sum, s) => sum + computeScanTotals(s).deductibleAmountCents, 0);
 
     const sortedDates = scans
       .map((s) => (s.date || s.created_at?.slice(0, 10)) ? new Date(s.date || s.created_at!) : new Date())
@@ -170,7 +172,7 @@ function DashboardContent() {
 
     return {
       totalDeductions: totalDed,
-      estimatedSaved: getTaxSavingsCents(totalDed),
+      estimatedSaved: Math.round(totalDed * 25 / 100),
       categoryData: Array.from(catTotals.entries()).sort(([, a], [, b]) => b - a),
       streakWeeks: streak,
       recentScans: recent,
@@ -294,14 +296,14 @@ function DashboardContent() {
                 const raw = s.raw_data as Scan['raw_data'];
                 const merchant = raw?.merchant_name || s.merchant_name || 'Unknown';
                 const date = s.date || raw?.date || s.created_at?.slice(0, 10) || '';
-                const ded = getDeductibleAmountCents(s as Parameters<typeof getDeductibleAmountCents>[0], true);
+                const t = computeScanTotals(s);
                 return (
                   <Link key={s.id} href="/receipts" className="flex items-center justify-between rounded-lg border border-white/[0.04] px-3 py-2 hover:bg-white/[0.04]">
                     <div>
                       <p className="text-sm font-medium text-white">{merchant}</p>
-                      <p className="text-xs text-zinc-500">{date}</p>
+                      <p className="text-xs text-zinc-500">{date} · Receipt: {formatCents(t.receiptTotalCents)} · Deductible: {formatCents(t.deductibleAmountCents)}</p>
                     </div>
-                    <span className="text-sm font-semibold text-[#4F46E5]">{formatCents(ded)}</span>
+                    <span className="text-sm font-semibold text-[#4F46E5]">{formatCents(t.taxSavingsCents)} saved</span>
                   </Link>
                 );
               })

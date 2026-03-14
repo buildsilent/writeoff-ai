@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { AppFooter } from '@/components/AppFooter';
 import { ScanResults } from '@/components/ScanResults';
-import { ScanCelebrationModal, getDeductionStatsFromResult } from '@/components/ScanCelebrationModal';
+import { ScanCelebrationModal, getFallbackTotalsFromResult } from '@/components/ScanCelebrationModal';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ScanSkeleton } from '@/components/Skeleton';
 import { Camera, FileText, Loader2, RotateCcw, Upload } from 'lucide-react';
@@ -545,7 +545,7 @@ function ScanContent() {
               result={{
                 merchant_name: result.merchant_name || 'Unknown',
                 date: result.date || null,
-                total_amount: result.total_amount ?? 0,
+                total_amount: (result as { receipt_total_cents?: number; total_amount?: number }).receipt_total_cents ?? (result as { total_amount?: number }).total_amount ?? 0,
                 line_items: result.line_items as Parameters<typeof ScanResults>[0]['result']['line_items'],
               }}
               saved={saved}
@@ -601,8 +601,7 @@ function ScanContent() {
         {showCelebration && result && (result as { id?: string }).id && (
           <ScanCelebrationModal
             scanId={(result as { id: string }).id}
-            fallbackDeductionCount={getDeductionStatsFromResult(result as Parameters<typeof getDeductionStatsFromResult>[0]).count}
-            fallbackSavingsCents={getDeductionStatsFromResult(result as Parameters<typeof getDeductionStatsFromResult>[0]).savingsCents}
+            fallbackTotals={getFallbackTotalsFromResult(result as Parameters<typeof getFallbackTotalsFromResult>[0])}
             onScanAnother={resetForNewScan}
             onClose={() => setShowCelebration(false)}
           />

@@ -4,6 +4,7 @@
  */
 
 import { getDeductibleAmountCents } from '@/lib/deductions';
+import { formatCents } from '@/lib/format';
 
 export interface ScanForInsights {
   id: string;
@@ -138,10 +139,10 @@ export function computeTaxHealthScore(scans: ScanForInsights[]): {
   const hasMeaningful = totalDeductionsCents >= 50000; // $500+
   if (hasMeaningful) {
     score += 25;
-    factors.push(`Substantial deductions tracked ($${(totalDeductionsCents / 100).toFixed(0)})`);
+    factors.push(`Substantial deductions tracked (${formatCents(totalDeductionsCents)})`);
   } else if (totalDeductionsCents > 0) {
     score += Math.min(15, Math.floor(totalDeductionsCents / 3333));
-    factors.push(`$${(totalDeductionsCents / 100).toFixed(0)} in deductions so far`);
+    factors.push(`${formatCents(totalDeductionsCents)} in deductions so far`);
   }
 
   // Gaps (max 20 pts) — not having obvious gaps
@@ -210,11 +211,11 @@ export function computeQuarterlyTax(
     const netCents = Math.max(0, incomeCents - totalDeductionsCents);
     const annualTaxCents = Math.round(netCents * (ESTIMATED_TAX_RATE + SCHEDULE_SE_RATE * 0.5));
     quarterlyCents = Math.round(annualTaxCents / 4);
-    message = `Based on your tracked income and deductions, your estimated Q${quarter} tax payment is $${(quarterlyCents / 100).toFixed(0)} — due ${dueDate}.`;
+    message = `Based on your tracked income and deductions, your estimated Q${quarter} tax payment is ${formatCents(quarterlyCents)} — due ${dueDate}.`;
   } else {
     const deductionSavings = Math.round(totalDeductionsCents * ESTIMATED_TAX_RATE);
     message = totalDeductionsCents > 0
-      ? `Your $${(totalDeductionsCents / 100).toFixed(0)} in deductions reduces your tax. Next payment due ${dueDate}. Add estimated income in Account for quarterly amount.`
+      ? `Your ${formatCents(totalDeductionsCents)} in deductions reduces your tax. Next payment due ${dueDate}. Add estimated income in Account for quarterly amount.`
       : `Quarterly estimated tax due ${dueDate}. Add income and scan receipts for an estimate.`;
   }
 
@@ -247,7 +248,7 @@ export function computeTaxSavingProjection(scans: ScanForInsights[]): {
 
   const message =
     totalDeductionsCents > 0
-      ? `At your current pace you will save an estimated $${(projectedSavings / 100).toFixed(0)} in taxes this year.`
+      ? `At your current pace you will save an estimated ${formatCents(projectedSavings)} in taxes this year.`
       : 'Scan more receipts to see your projected tax savings.';
 
   return { projectedCents: projectedSavings, message };

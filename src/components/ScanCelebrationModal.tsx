@@ -5,31 +5,28 @@ import Link from 'next/link';
 import confetti from 'canvas-confetti';
 import { BarChart3, CheckCircle2, Loader2, Receipt, Share2 } from 'lucide-react';
 import { formatCents } from '@/lib/format';
-import { getDeductionStatsFromLineItems, type LineItemInput } from '@/lib/deductions';
 
-interface LineItem {
-  amount: number;
-  is_deductible: boolean;
-  deduction_percent?: number;
+interface ScanTotals {
+  receiptTotalCents: number;
+  deductibleAmountCents: number;
+  taxSavingsCents: number;
 }
 
 interface ScanCelebrationModalProps {
   scanId: string;
-  /** Fallback if fetch fails — never used for display when fetch succeeds */
-  fallbackDeductionCount?: number;
-  fallbackSavingsCents?: number;
+  /** Fallback if fetch fails */
+  fallbackTotals?: ScanTotals;
   onScanAnother: () => void;
   onClose: () => void;
 }
 
 export function ScanCelebrationModal({
   scanId,
-  fallbackDeductionCount = 0,
-  fallbackSavingsCents = 0,
+  fallbackTotals = { receiptTotalCents: 0, deductibleAmountCents: 0, taxSavingsCents: 0 },
   onScanAnother,
   onClose,
 }: ScanCelebrationModalProps) {
-  const [stats, setStats] = useState<{ count: number; savingsCents: number } | null>(null);
+  const [totals, setTotals] = useState<ScanTotals | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,32 +35,21 @@ export function ScanCelebrationModal({
         const res = await fetch(`/api/scans/${scanId}`);
         if (!res.ok || cancelled) return;
         const data = await res.json();
-        const s = getDeductionStatsFromLineItems(data.line_items ?? [], true);
-        if (!cancelled) setStats({ count: s.count, savingsCents: s.taxSavingsCents });
-
-        if (process.env.NODE_ENV === 'development') {
-          const listRes = await fetch('/api/scans');
-          if (listRes.ok) {
-            const list = await listRes.json();
-            const match = list.find((r: { id: string }) => r.id === scanId);
-            if (match) {
-              const lineItems = (match.raw_data as { line_items?: LineItemInput[] })?.line_items ?? [];
-              const listStats = getDeductionStatsFromLineItems(lineItems, true);
-              if (s.taxSavingsCents !== listStats.taxSavingsCents) {
-                console.error('[ScanCelebration] Amount mismatch: popup', s.taxSavingsCents, 'vs dashboard', listStats.taxSavingsCents);
-              }
-            }
-          }
+        if (!cancelled) {
+          setTotals({
+            receiptTotalCents: data.receipt_total_cents ?? 0,
+            deductibleAmountCents: data.deductible_amount_cents ?? 0,
+            taxSavingsCents: data.tax_savings_cents ?? 0,
+          });
         }
       } catch {
-        if (!cancelled) setStats({ count: fallbackDeductionCount, savingsCents: fallbackSavingsCents });
+        if (!cancelled) setTotals(fallbackTotals);
       }
     })();
     return () => { cancelled = true; };
-  }, [scanId, fallbackDeductionCount, fallbackSavingsCents]);
+  }, [scanId]);
 
-  const deductionCount = stats?.count ?? fallbackDeductionCount;
-  const estimatedSavingsCents = stats?.savingsCents ?? fallbackSavingsCents;
+  const t = totals ?? fallbackTotals;
   useEffect(() => {
     const duration = 2000;
     const end = Date.now() + duration;
@@ -88,7 +74,7 @@ export function ScanCelebrationModal({
     frame();
   }, []);
 
-  const shareText = `I just found $${(estimatedSavingsCents / 100).toFixed(0)} in tax deductions in 30 seconds using TaxSnapper 🔒 taxsnapper.com`;
+  const shareText = `I just found ${formatCents(t.taxSavingsCents)} in estimated tax savings in 30 seconds using TaxSnapper 🔒 taxsnapper.com`;
   const handleShare = async () => {
     if (navigator.share) {
       try {
@@ -108,7 +94,7 @@ export function ScanCelebrationModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="relative w-full max-w-md rounded-[16px] border border-emerald-500/30 bg-[#0f1729] p-6 shadow-2xl">
-        {stats === null && (
+        {totals === null && (
           <div className="absolute inset-0 flex items-center justify-center rounded-[16px] bg-[#0f1729]/90">
             <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
           </div>
@@ -117,13 +103,12 @@ export function ScanCelebrationModal({
           <CheckCircle2 className="h-6 w-6 shrink-0" />
           <h2 className="text-xl font-semibold">Receipt saved!</h2>
         </div>
-        <p className="mt-2 text-zinc-400">Here&apos;s your summary:</p>
-        <p className="mt-1 text-sm text-zinc-500">
-          {deductionCount === 1 ? '1 deduction found' : `${deductionCount} deductions found`}
-        </p>
+        <p className="mt-2 text-zinc-400">Receipt total: {formatCents(t.receiptTotalCents)} — Deductible amount: {formatCents(t.deductibleAmountCents)} — Estimated tax savings: {formatCents(t.taxSavingsCents)}</p>
         <div className="mt-4 rounded-[12px] border border-emerald-500/30 bg-emerald-500/10 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-emerald-400/90">Est. tax savings from this receipt</p>
-          <p className="mt-1 text-3xl font-bold text-emerald-400">{formatCents(estimatedSavingsCents)}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-emerald-400/90">Summary</p>
+          <p className="mt-1 text-sm text-zinc-300">Receipt total: {formatCents(t.receiptTotalCents)}</p>
+          <p className="mt-0.5 text-sm text-zinc-300">Deductible amount: {formatCents(t.deductibleAmountCents)}</p>
+          <p className="mt-0.5 text-base font-bold text-emerald-400">Estimated tax savings: {formatCents(t.taxSavingsCents)}</p>
         </div>
         <div className="mt-6 flex flex-col gap-3">
           <button
@@ -163,8 +148,31 @@ export function ScanCelebrationModal({
   );
 }
 
-/** Uses lib/deductions - API returns amounts in cents */
-export function getDeductionStatsFromResult(result: { line_items?: LineItem[] }): { count: number; savingsCents: number } {
-  const stats = getDeductionStatsFromLineItems(result.line_items ?? [], true);
-  return { count: stats.count, savingsCents: stats.taxSavingsCents };
+/** Build fallback totals from API result for celebration modal */
+export function getFallbackTotalsFromResult(result: {
+  total_amount?: number;
+  receipt_total_cents?: number;
+  deductible_amount_cents?: number;
+  tax_savings_cents?: number;
+  line_items?: Array<{ amount?: number; deduction_percent?: number; is_deductible?: boolean; deductible_amount_cents?: number }>;
+}): { receiptTotalCents: number; deductibleAmountCents: number; taxSavingsCents: number } {
+  if (typeof result.receipt_total_cents === 'number' && typeof result.deductible_amount_cents === 'number' && typeof result.tax_savings_cents === 'number') {
+    return {
+      receiptTotalCents: result.receipt_total_cents,
+      deductibleAmountCents: result.deductible_amount_cents,
+      taxSavingsCents: result.tax_savings_cents,
+    };
+  }
+  const receiptTotalCents = result.receipt_total_cents ?? result.total_amount ?? 0;
+  const items = result.line_items ?? [];
+  const deductibleAmountCents = items.reduce((s, li) => {
+    if (typeof li.deductible_amount_cents === 'number') return s + li.deductible_amount_cents;
+    if (!li.is_deductible) return s;
+    const amt = Math.round(Number(li.amount ?? 0));
+    const pct = li.deduction_percent ?? 100;
+    const safePct = pct >= 75 ? 100 : pct >= 25 ? 50 : 0;
+    return s + Math.round(amt * safePct / 100);
+  }, 0);
+  const taxSavingsCents = Math.round(deductibleAmountCents * 25 / 100);
+  return { receiptTotalCents, deductibleAmountCents, taxSavingsCents };
 }

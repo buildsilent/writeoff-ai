@@ -22,7 +22,7 @@ import {
 import { ReceiptsSkeleton } from '@/components/Skeleton';
 import { getCategoryEmoji, getConfidenceLabel, getConfidenceColor } from '@/lib/constants';
 import { formatCents } from '@/lib/format';
-import { getDeductibleAmountCents } from '@/lib/deductions';
+import { computeScanTotals } from '@/lib/deductions';
 
 interface LineItem {
   description: string;
@@ -74,9 +74,6 @@ function getConfidenceScore(scan: Scan): number {
   return first?.confidence ?? 0.8;
 }
 
-function getDeductionAmountCents(scan: Scan): number {
-  return getDeductibleAmountCents(scan, true);
-}
 
 function isPhotoScan(scan: Scan): boolean {
   return Boolean(scan.receipt_image_url);
@@ -164,7 +161,7 @@ function ReceiptCard({ scan, onClick }: { scan: Scan; onClick: () => void }) {
   const raw = scan.raw_data as Scan['raw_data'];
   const merchant = raw?.merchant_name || scan.merchant_name || 'Unknown';
   const date = raw?.date || scan.date || scan.created_at?.slice(0, 10) || '';
-  const ded = getDeductionAmountCents(scan);
+  const { receiptTotalCents, deductibleAmountCents, taxSavingsCents } = computeScanTotals(scan);
   const cat = getPrimaryCategory(scan);
   const emoji = getCategoryEmoji(cat);
   const confidence = getConfidenceScore(scan);
@@ -175,26 +172,29 @@ function ReceiptCard({ scan, onClick }: { scan: Scan; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[44px] w-full cursor-pointer items-center gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4 text-left transition-colors hover:bg-white/[0.04] hover:shadow-[0_0_20px_rgba(79,70,229,0.1)]"
+      className="flex min-h-[44px] w-full cursor-pointer flex-col gap-1 rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4 text-left transition-colors hover:bg-white/[0.04] hover:shadow-[0_0_20px_rgba(79,70,229,0.1)] sm:flex-row sm:items-center sm:gap-4"
     >
-      {scan.receipt_image_url ? (
-        <img
-          src={scan.receipt_image_url}
-          alt=""
-          className="h-14 w-14 shrink-0 rounded-[12px] object-cover"
-        />
-      ) : (
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] border border-white/[0.08] bg-white/[0.02]">
-          <FileText className="h-7 w-7 text-zinc-500" />
+      <div className="flex flex-1 items-center gap-4">
+        {scan.receipt_image_url ? (
+          <img
+            src={scan.receipt_image_url}
+            alt=""
+            className="h-14 w-14 shrink-0 rounded-[12px] object-cover"
+          />
+        ) : (
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] border border-white/[0.08] bg-white/[0.02]">
+            <FileText className="h-7 w-7 text-zinc-500" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-white">{merchant}</p>
+          <p className="text-xs text-zinc-500">{date || 'No date'}</p>
         </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-white">{merchant}</p>
-        <p className="text-xs text-zinc-500">{date || 'No date'}</p>
       </div>
-      <div className="shrink-0 text-right">
-        <p className="font-semibold text-[#4F46E5]">{formatCents(Number(scan.amount))}</p>
-        <p className="text-xs text-zinc-500">{formatCents(ded)} deductible</p>
+      <div className="flex shrink-0 flex-col items-end gap-0.5 text-right text-xs">
+        <p><span className="text-zinc-500">Receipt total:</span> {formatCents(receiptTotalCents)}</p>
+        <p><span className="text-zinc-500">Deductible:</span> {formatCents(deductibleAmountCents)}</p>
+        <p><span className="text-zinc-500">Est. tax savings:</span> <span className="font-semibold text-[#4F46E5]">{formatCents(taxSavingsCents)}</span></p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-0.5">
         <span className="text-xl">{emoji}</span>
@@ -305,7 +305,19 @@ function ReceiptsContent() {
   }, [scans, searchQuery, categoryFilter, typeFilter, dateRange, amountSort]);
 
   const cabinet = useMemo(() => buildCabinet(filteredScans), [filteredScans]);
-  const grandTotal = useMemo(() => scans.reduce((sum, s) => sum + getDeductionAmountCents(s), 0), [scans]);
+  const grandTotals = useMemo(() => {
+    let receiptTotal = 0, deductibleTotal = 0;
+    for (const s of scans) {
+      const t = computeScanTotals(s);
+      receiptTotal += t.receiptTotalCents;
+      deductibleTotal += t.deductibleAmountCents;
+    }
+    return {
+      receiptTotalCents: receiptTotal,
+      deductibleAmountCents: deductibleTotal,
+      taxSavingsCents: Math.round(deductibleTotal * 25 / 100),
+    };
+  }, [scans]);
   const years = Array.from(cabinet.keys()).sort((a, b) => (a === UNDATED_YEAR ? 1 : b === UNDATED_YEAR ? -1 : b - a));
   const hasReceipts = scans.length > 0;
 
@@ -377,8 +389,10 @@ function ReceiptsContent() {
         {/* Grand total banner */}
         {hasReceipts && (
           <div className="mt-6 rounded-[12px] border border-[#4F46E5]/20 bg-[#4F46E5]/5 p-4 sm:p-6">
-            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Total deductions (all time)</p>
-            <p className="mt-1 text-3xl font-bold text-[#4F46E5] sm:text-4xl">{formatCents(grandTotal)}</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Totals (all time)</p>
+            <p className="mt-1 text-lg font-semibold text-white sm:text-xl">
+              Total spent: {formatCents(grandTotals.receiptTotalCents)} — Total deductible: {formatCents(grandTotals.deductibleAmountCents)} — Total tax savings: {formatCents(grandTotals.taxSavingsCents)}
+            </p>
           </div>
         )}
 
@@ -484,7 +498,7 @@ function ReceiptsContent() {
               let yearDed = 0;
               for (const m of months) {
                 for (const [, arr] of byMonth.get(m)!) {
-                  yearDed += arr.reduce((s, sc) => s + getDeductionAmountCents(sc), 0);
+                  yearDed += arr.reduce((s, sc) => s + computeScanTotals(sc).deductibleAmountCents, 0);
                 }
               }
               const isYearOpen = expandedYears.has(year);
@@ -511,7 +525,7 @@ function ReceiptsContent() {
                       });
                       let monthDed = 0;
                       for (const [, arr] of byCat) {
-                        monthDed += arr.reduce((s, sc) => s + getDeductionAmountCents(sc), 0);
+                        monthDed += arr.reduce((s, sc) => s + computeScanTotals(sc).deductibleAmountCents, 0);
                       }
                       const monthKey = `${year}-${month}`;
                       const isMonthOpen = expandedMonths.has(monthKey);
@@ -531,7 +545,7 @@ function ReceiptsContent() {
                           <div className="space-y-3 pl-2">
                             {cats.map((cat) => {
                               const scansInCat = byCat.get(cat)!;
-                              const catDed = scansInCat.reduce((s, sc) => s + getDeductionAmountCents(sc), 0);
+                              const catDed = scansInCat.reduce((s, sc) => s + computeScanTotals(sc).deductibleAmountCents, 0);
                               const catKey = `${year}-${month}-${cat}`;
                               const isCatOpen = expandedCats.has(catKey);
                               return (

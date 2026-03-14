@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import { LineItemCard } from './LineItemCard';
 import { formatCents } from '@/lib/format';
+import { computeScanTotals } from '@/lib/deductions';
 
 interface LineItem {
   description: string;
@@ -40,7 +41,7 @@ export function ReceiptDetailModal({ scan, onClose }: ReceiptDetailModalProps) {
   const raw = scan.raw_data as Scan['raw_data'];
   const merchant = raw?.merchant_name || scan.merchant_name || 'Unknown';
   const date = raw?.date || scan.date || null;
-  const total = raw?.total_amount ?? Number(scan.amount);
+  const { receiptTotalCents, deductibleAmountCents, taxSavingsCents } = computeScanTotals(scan);
   const lineItems = raw?.line_items ?? [{
     description: merchant,
     amount: Number(scan.amount),
@@ -84,9 +85,9 @@ export function ReceiptDetailModal({ scan, onClose }: ReceiptDetailModalProps) {
               />
             </div>
           )}
-          <div className="flex justify-between text-sm text-zinc-500">
-            <span>{date || 'No date'}</span>
-            <span>Total: {formatCents(total)}</span>
+          <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-3 text-sm">
+            <p className="text-zinc-500">{date || 'No date'}</p>
+            <p className="mt-1">Receipt total: {formatCents(receiptTotalCents)} — Deductible amount: {formatCents(deductibleAmountCents)} — Est. tax savings: {formatCents(taxSavingsCents)}</p>
           </div>
           <div className="mt-4 space-y-4">
             {lineItems.map((item, idx) => (
